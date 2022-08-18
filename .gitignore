@@ -1,0 +1,8 @@
+latent_diffusion.egg-info
+models/ldm/stable-diffusion-v1/**
+
+outputs/**
+
+
+*.pyc
+
