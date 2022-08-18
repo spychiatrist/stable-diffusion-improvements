@@ -228,6 +228,8 @@ def main():
                 all_samples = list()
                 for n in trange(opt.n_iter, desc="Sampling"):
                     for prompts in tqdm(data, desc="data"):
+
+                        seed_everything(opt.seed)
                         uc = None
                         if opt.scale != 1.0:
                             uc = model.get_learned_conditioning(batch_size * [""])
@@ -257,6 +259,8 @@ def main():
 
                         if not opt.skip_grid:
                             all_samples.append(x_samples_ddim)
+
+                        opt.seed += 1
 
                 if not opt.skip_grid:
                     # additionally, save as grid
