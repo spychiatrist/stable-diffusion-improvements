@@ -168,6 +168,12 @@ def main():
         help="the seed (for reproducible sampling)",
     )
     parser.add_argument(
+        "--seed_offset",
+        type=int,
+        default=0,
+        help="how many samples forward should the seed state emulate",
+    )
+    parser.add_argument(
         "--precision",
         type=str,
         help="evaluate at this precision",
@@ -245,6 +251,7 @@ def main():
                                                          unconditional_guidance_scale=opt.scale,
                                                          unconditional_conditioning=uc,
                                                          eta=opt.ddim_eta,
+                                                         seed_offset=opt.seed_offset,
                                                          x_T=start_code)
 
                         x_samples_ddim = model.decode_first_stage(samples_ddim)
