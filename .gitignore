@@ -2,7 +2,8 @@ latent_diffusion.egg-info
 models/ldm/stable-diffusion-v1/**
 outputs/**
 
+prompts.txt
 
 *.pyc
-src/**
+src
 .vscode
