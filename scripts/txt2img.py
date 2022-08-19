@@ -227,6 +227,8 @@ def main():
 
                 while True:
                     #await mutex to proceed
+                    if opt.interactive:
+                        window.write_event_value("-READY-", None)
                     sem_generate.acquire()
 
                     os.makedirs(opt.outdir, exist_ok=True)
@@ -341,7 +343,11 @@ def make_ui():
         [TextLabel('Samples'), sg.Input(key='n_samples', default_text=opt.n_samples)],
         [TextLabel('Guidance Scale'), sg.Input(key='scale', default_text=opt.scale)],
         [TextLabel('Sampler Eta'), sg.Input(key='ddim_eta', default_text=opt.ddim_eta)],
-        [sg.Button('Generate', size=(30,4))],]
+        [
+            sg.Checkbox('Skip Sample Save',key='skip_save', default=opt.skip_save),
+            sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid)
+        ],
+        [sg.Button('Generate', size=(30,4), disabled=True)],]
 
     layout_imageviewer = [
         [sg.Text('Results', font='Any 13')],
@@ -400,7 +406,17 @@ def ui_thread():
 
             opt.ddim_eta =      float(values['ddim_eta'])
             opt.scale =         float(values['scale'])
+
+            opt.skip_grid =     values['skip_grid']
+            opt.skip_save =     values['skip_save']
+
+            window['Generate'].update(disabled=True)
+
             sem_generate.release()
+
+        elif event == '-READY-':
+            window['Generate'].update(disabled=False)
+
 
         elif event == '-IMAGE-': # new image from backend event
             imglist.insert(0, values[event])
