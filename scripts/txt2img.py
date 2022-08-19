@@ -260,7 +260,8 @@ def main():
                             n_rows = len(data)
                             data = list(chunk(data, batch_size))
 
-                    
+                    def interactiveCallback( i ):
+                        window.write_event_value('-ITER-', i)
 
                     tic = time.time()
                     all_samples = list()
@@ -284,7 +285,8 @@ def main():
                                                             unconditional_conditioning=uc,
                                                             eta=opt.ddim_eta,
                                                             seed_offset=opt.seed_offset,
-                                                            x_T=start_code)
+                                                            x_T=start_code,
+                                                            callback=interactiveCallback if opt.interactive else None)
 
                             x_samples_ddim = model.decode_first_stage(samples_ddim)
                             x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
@@ -347,7 +349,8 @@ def make_ui():
             sg.Checkbox('Skip Sample Save',key='skip_save', default=opt.skip_save),
             sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid)
         ],
-        [sg.Button('Generate', size=(30,4), disabled=True)],]
+        [sg.Button('Generate', size=(20,2), disabled=True), sg.ProgressBar(k='GenerateProgress', max_value=100, s=(30, 20), orientation='h')],
+        ]
 
     layout_imageviewer = [
         [sg.Text('Results', font='Any 13')],
@@ -390,6 +393,7 @@ def ui_thread():
                 'hist5',
                 'hist6',
                 ]
+    itercount = 0
 
     while True:
 
@@ -409,6 +413,8 @@ def ui_thread():
 
             opt.skip_grid =     values['skip_grid']
             opt.skip_save =     values['skip_save']
+
+            itercount = 0
 
             window['Generate'].update(disabled=True)
 
@@ -431,6 +437,10 @@ def ui_thread():
             i = imgKeys.index(event)
             if len(imglist) > i:
                 window['Image'].update(data=ImageTk.PhotoImage(imglist[i]))
+        
+        elif event == '-ITER-':
+
+            window['GenerateProgress'].update(current_count=values[event], max=opt.ddim_steps)
             
 
         if event == sg.WIN_CLOSED:
