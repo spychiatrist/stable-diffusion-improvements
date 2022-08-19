@@ -168,6 +168,12 @@ def main():
         help="the seed (for reproducible sampling)",
     )
     parser.add_argument(
+        "--seed_offset",
+        type=int,
+        default=0,
+        help="how many samples forward should the seed state emulate",
+    )
+    parser.add_argument(
         "--precision",
         type=str,
         help="evaluate at this precision",
@@ -229,6 +235,8 @@ def main():
                 all_samples = list()
                 for n in trange(opt.n_iter, desc="Sampling"):
                     for prompts in tqdm(data, desc="data"):
+
+                        seed_everything(opt.seed)
                         uc = None
                         if opt.scale != 1.0:
                             uc = model.get_learned_conditioning(batch_size * [""])
@@ -244,6 +252,7 @@ def main():
                                                          unconditional_guidance_scale=opt.scale,
                                                          unconditional_conditioning=uc,
                                                          eta=opt.ddim_eta,
+                                                         seed_offset=opt.seed_offset,
                                                          x_T=start_code)
 
                         x_samples_ddim = model.decode_first_stage(samples_ddim)
@@ -258,6 +267,8 @@ def main():
 
                         if not opt.skip_grid:
                             all_samples.append(x_samples_ddim)
+
+                        opt.seed += 1
 
                 if not opt.skip_grid:
                     # additionally, save as grid

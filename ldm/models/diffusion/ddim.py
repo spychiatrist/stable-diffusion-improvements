@@ -73,6 +73,7 @@ class DDIMSampler(object):
                verbose=True,
                x_T=None,
                log_every_t=100,
+               seed_offset=0, # Seed sample offset (num. of seed contexts to move forward for noise generation)
                unconditional_guidance_scale=1.,
                unconditional_conditioning=None,
                # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
@@ -105,6 +106,7 @@ class DDIMSampler(object):
                                                     corrector_kwargs=corrector_kwargs,
                                                     x_T=x_T,
                                                     log_every_t=log_every_t,
+                                                    seed_offset=seed_offset,
                                                     unconditional_guidance_scale=unconditional_guidance_scale,
                                                     unconditional_conditioning=unconditional_conditioning,
                                                     )
@@ -114,13 +116,18 @@ class DDIMSampler(object):
     def ddim_sampling(self, cond, shape,
                       x_T=None, ddim_use_original_steps=False,
                       callback=None, timesteps=None, quantize_denoised=False,
-                      mask=None, x0=None, img_callback=None, log_every_t=100,
+                      mask=None, x0=None, img_callback=None, log_every_t=100, seed_offset=0,
                       temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
                       unconditional_guidance_scale=1., unconditional_conditioning=None,):
         device = self.model.betas.device
         b = shape[0]
         if x_T is None:
-            img = torch.randn(shape, device=device)
+            _, el0, el1, el2 = shape
+            shape_single = (1, el0, el1, el2)
+            # burn through seed_offset num. of samples
+            _ = [torch.randn(shape_single, device=device) for i in range(seed_offset) ]
+            # workaround for sequentially-deterministic torch.randn generation per image layer in tensor
+            img = torch.cat( [torch.randn(shape_single, device=device) for i in range(b) ], 0)
         else:
             img = x_T
 
@@ -197,7 +204,8 @@ class DDIMSampler(object):
             pred_x0, _, *_ = self.model.first_stage_model.quantize(pred_x0)
         # direction pointing to x_t
         dir_xt = (1. - a_prev - sigma_t**2).sqrt() * e_t
-        noise = sigma_t * noise_like(x.shape, device, repeat_noise) * temperature
+
+        noise = sigma_t * noise_like(x.shape, device, repeat_noise) * temperature # TODO possible source of random deviation
         if noise_dropout > 0.:
             noise = torch.nn.functional.dropout(noise, p=noise_dropout)
         x_prev = a_prev.sqrt() * pred_x0 + dir_xt + noise
