@@ -4,5 +4,5 @@ outputs/**
 prompts.txt
 
 *.pyc
-
+src/**
 .vscode
