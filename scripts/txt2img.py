@@ -3,8 +3,9 @@ from ast import arg
 import torch
 import numpy as np
 from omegaconf import OmegaConf
-from PIL import Image
+from PIL import Image,ImageTk
 import PySimpleGUI as sg
+import tkinter as tk
 import threading
 from tqdm import tqdm, trange
 from itertools import islice
@@ -47,6 +48,8 @@ def load_model_from_config(config, ckpt, verbose=False):
 opt = None
 
 def main():
+    global window
+    global opt
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -197,9 +200,8 @@ def main():
         opt.ckpt = "models/ldm/text2img-large/model.ckpt"
         opt.outdir = "outputs/txt2img-samples-laion400m"
 
-    window = None
     if opt.interactive:
-        window = make_ui()
+        threading.Thread(target=ui_thread).start()
         sem_generate.acquire()
 
     seed_everything(opt.seed)
@@ -215,21 +217,7 @@ def main():
     else:
         sampler = DDIMSampler(model)
 
-    os.makedirs(opt.outdir, exist_ok=True)
-    outpath = opt.outdir
-
-    batch_size = opt.n_samples
-    n_rows = opt.n_rows if opt.n_rows > 0 else batch_size
     
-
-    sample_path = os.path.join(outpath, "samples")
-    os.makedirs(sample_path, exist_ok=True)
-    base_count = len(os.listdir(sample_path))
-    grid_count = len(os.listdir(outpath)) - 1
-
-    start_code = None
-    if opt.fixed_code:
-        start_code = torch.randn([opt.n_samples, opt.C, opt.H // opt.f, opt.W // opt.f], device=device)
 
     precision_scope = autocast if opt.precision=="autocast" else nullcontext
     with torch.no_grad():
@@ -240,6 +228,24 @@ def main():
                 while True:
                     #await mutex to proceed
                     sem_generate.acquire()
+
+                    os.makedirs(opt.outdir, exist_ok=True)
+                    outpath = opt.outdir
+
+                    batch_size = opt.n_samples
+                    n_rows = opt.n_rows if opt.n_rows > 0 else batch_size
+                    
+
+                    sample_path = os.path.join(outpath, "samples")
+                    os.makedirs(sample_path, exist_ok=True)
+                    base_count = len(os.listdir(sample_path))
+                    grid_count = len(os.listdir(outpath)) - 1
+
+                    start_code = None
+                    if opt.fixed_code:
+                        start_code = torch.randn([opt.n_samples, opt.C, opt.H // opt.f, opt.W // opt.f], device=device)
+
+
                     if not opt.from_file:
                         prompt = opt.prompt
                         assert prompt is not None
@@ -281,11 +287,13 @@ def main():
                             x_samples_ddim = model.decode_first_stage(samples_ddim)
                             x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
 
-                            if not opt.skip_save:
-                                for x_sample in x_samples_ddim:
-                                    x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
-                                    Image.fromarray(x_sample.astype(np.uint8)).save(
-                                        os.path.join(sample_path, f"{base_count:05}.png"))
+                            for x_sample in x_samples_ddim:
+                                x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
+                                img = Image.fromarray(x_sample.astype(np.uint8))
+                                if opt.interactive:
+                                    window.write_event_value("-IMAGE-", img)
+                                if not opt.skip_save:
+                                    img.save(os.path.join(sample_path, f"{base_count:05}.png"))
                                     base_count += 1
 
                             if not opt.skip_grid:
@@ -313,23 +321,106 @@ def main():
     print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
           f" \nEnjoy.")
 
+window = None
 
 def make_ui():
+    global opt
+    global window
     print("Starting UI...")
-    layout = [[sg.Button('Do the thing', size=(30,4))]]
-    _window = sg.Window('txt2img Interactive', layout, size=(1440,900))
 
-    threading.Thread(target=ui_thread, args=(_window,)).start()
+    def TextLabel(text): return sg.Text(text+':', justification='r', size=(15,1))
+    def ThumbnailImage(key): return sg.Image(size=(64,64), subsample=4, key=key, p=5, background_color=sg.theme_button_color()[1], enable_events=True)
 
-    return _window
+    layout_settings = [
+        [sg.Text('Parameters', font='Any 13')],
+        [TextLabel('Prompt'), sg.Input(key='prompt', default_text=opt.prompt)],
+        [TextLabel('Seed'), sg.Input(key='seed', default_text=opt.seed)],
+        [TextLabel('Seed Sampler Offset'), sg.Input(key='seed_offset', default_text=opt.seed_offset)],
+        [TextLabel('Sampler Substeps'), sg.Input(key='ddim_steps', default_text=opt.ddim_steps)],
+        [TextLabel('Iterations'), sg.Input(key='n_iter', default_text=opt.n_iter)],
+        [TextLabel('Samples'), sg.Input(key='n_samples', default_text=opt.n_samples)],
+        [TextLabel('Guidance Scale'), sg.Input(key='scale', default_text=opt.scale)],
+        [TextLabel('Sampler Eta'), sg.Input(key='ddim_eta', default_text=opt.ddim_eta)],
+        [sg.Button('Generate', size=(30,4))],]
+
+    layout_imageviewer = [
+        [sg.Text('Results', font='Any 13')],
+        [
+            ThumbnailImage('hist0'), 
+            ThumbnailImage('hist1'), 
+            ThumbnailImage('hist2'), 
+            ThumbnailImage('hist3'), 
+            ThumbnailImage('hist4'), 
+            ThumbnailImage('hist5'), 
+            ThumbnailImage('hist6'), 
+            ],
+        [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
+    ]
+
+    layout = [
+        [sg.Col(layout_settings, p=0), sg.VSeparator(), sg.Col(layout_imageviewer, p=0)]
+    ]
+
+    window = sg.Window('txt2img Interactive', layout, size=(1440,900))
+
+
+
 
 sem_generate = threading.Semaphore(1)
 
 
-def ui_thread(window: sg.Window):
+def ui_thread():
+    global opt
+
+    make_ui()
+
+    imglist = []
+    imgKeys = [
+                'hist0',
+                'hist1',
+                'hist2',
+                'hist3',
+                'hist4',
+                'hist5',
+                'hist6',
+                ]
+
     while True:
+
         event, values = window.read()
-        sem_generate.release()
+
+        if event == 'Generate': # generate button event
+            opt.prompt =        values['prompt']
+
+            opt.seed =          int(values['seed'])
+            opt.seed_offset =   int(values['seed_offset'])
+            opt.ddim_steps =    int(values['ddim_steps'])
+            opt.n_iter =        int(values['n_iter'])
+            opt.n_samples =     int(values['n_samples'])
+
+            opt.ddim_eta =      float(values['ddim_eta'])
+            opt.scale =         float(values['scale'])
+            sem_generate.release()
+
+        elif event == '-IMAGE-': # new image from backend event
+            imglist.insert(0, values[event])
+            for i, img in enumerate(imglist):
+                if i == 0: 
+                    window['Image'].update(data=ImageTk.PhotoImage(img))
+                elif i >= len(imgKeys):
+                    break
+                window[imgKeys[i]].update(data=ImageTk.PhotoImage(img.resize((64,64), resample=Image.Resampling.BICUBIC)))
+
+        elif event in imgKeys: # clicked a thumbnail
+            i = imgKeys.index(event)
+            if len(imglist) > i:
+                window['Image'].update(data=ImageTk.PhotoImage(imglist[i]))
+            
+
+        if event == sg.WIN_CLOSED:
+            os._exit(1)
+
+
 
 if __name__ == "__main__":
     main()
