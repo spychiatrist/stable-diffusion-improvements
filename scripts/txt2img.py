@@ -374,7 +374,7 @@ def make_ui():
             ThumbnailImage('hist6'), 
             ],
         [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
-        [sg.Text('Sample:', justification='r', size=(15,1), key='SampleInfo')],
+        [sg.Text('Sample:', justification='l', expand_x=True, size=(60,4), key='SampleInfo')],
         [sg.Button('Clear All', size=(8,1), key='-CLEARALL-'), sg.Push(), sg.Button('Save', size=(12,1), key='-SAVE-'), sg.Button('Save-All', size=(12,1), key='-SAVEALL-')], 
     ]
 
@@ -414,7 +414,7 @@ def ui_thread():
         global curr_sample_i
         if index < len(datalist) and index >= 0:
             _img, _options, _samplenum = datalist[index]
-            window['SampleInfo'].update(f"Sample: seed {_options['seed']}:{_options['seed_offset']}, sample {_samplenum}.")
+            window['SampleInfo'].update(f"Sample: seed {_options['seed']}:{_options['seed_offset']}, sample {_samplenum}.\n{_options['ddim_steps']} substeps, g_scale: {_options['scale']}\n\"{_options['prompt']}\"")
             window['Image'].update(data=ImageTk.PhotoImage(_img))
             curr_sample_i = index
         else:
