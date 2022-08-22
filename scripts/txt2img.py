@@ -375,7 +375,7 @@ def make_ui():
             ],
         [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
         [sg.Text('Sample:', justification='r', size=(15,1), key='SampleInfo')],
-        [sg.Button('Save', size=(12,1), key='-SAVE-'), sg.Button('Save-All', size=(12,1), key='-SAVEALL-')],
+        [sg.Button('Clear All', size=(8,1), key='-CLEARALL-'), sg.Push(), sg.Button('Save', size=(12,1), key='-SAVE-'), sg.Button('Save-All', size=(12,1), key='-SAVEALL-')], 
     ]
 
     layout = [
@@ -408,6 +408,7 @@ def ui_thread():
                 ]
     itercount = 0
 
+    blankImg = Image.new('RGB', (512, 512), sg.theme_button_color()[1])
 
     def SetSampleAndInfo(index):
         global curr_sample_i
@@ -418,13 +419,14 @@ def ui_thread():
             curr_sample_i = index
         else:
             window['SampleInfo'].update('Sample: None')
-            window['Image'].update(data=None, size=(512,512))
+            window['Image'].update(data=ImageTk.PhotoImage(blankImg), size=(512,512))
             
         for i, imgKey in enumerate(imgKeys):
             if i == curr_sample_i:
                 window[imgKey+'_f'].update(value="S")
             else:
                 window[imgKey+'_f'].update(value="")
+
 
     def SaveImage(index):
         _img, _options, _i = datalist[index]
@@ -498,7 +500,12 @@ def ui_thread():
             if len(datalist) > 0:
                 SaveImage(curr_sample_i)
 
-                
+        elif event == '-CLEARALL-':
+            datalist.clear()
+            for key in imgKeys:
+                window[key].update(data=ImageTk.PhotoImage(blankImg.resize((64,64), resample=Image.Resampling.BICUBIC)), size=(64,64))
+            SetSampleAndInfo(0)
+
         elif event == '-SAVEALL-':
             for i in reversed(range(0, len(datalist))):
                 SaveImage(i) #save in reverse order of history to get newest versions of overwrites last.
