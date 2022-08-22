@@ -291,11 +291,12 @@ def main():
                             x_samples_ddim = model.decode_first_stage(samples_ddim)
                             x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
 
-                            for x_sample in x_samples_ddim:
+                            for i, x_sample in enumerate(x_samples_ddim):
                                 x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
                                 img = Image.fromarray(x_sample.astype(np.uint8))
                                 if opt.interactive:
-                                    window.write_event_value("-IMAGE-", img)
+                                    _metadata = (img, opt.__dict__.copy(), i)
+                                    window.write_event_value("-IMAGE-", _metadata)
                                 if not opt.skip_save:
                                     img.save(os.path.join(sample_path, f"{base_count:05}.png"))
                                     base_count += 1
@@ -325,7 +326,7 @@ def main():
     print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
           f" \nEnjoy.")
 
-window = None
+window: sg.Window = None
 
 def make_ui():
     global opt
@@ -333,7 +334,9 @@ def make_ui():
     print("Starting UI...")
 
     def TextLabel(text): return sg.Text(text+':', justification='r', size=(15,1))
-    def ThumbnailImage(key): return sg.Image(size=(64,64), subsample=4, key=key, p=5, background_color=sg.theme_button_color()[1], enable_events=True)
+    def ThumbnailImage(key): 
+        _l = [[sg.Image(size=(64,64), subsample=4, key=key, p=2, background_color=sg.theme_background_color(), enable_events=True)]]
+        return sg.Frame("", _l, p=1, background_color=sg.theme_button_color()[1], key=key+'_f' )
 
     layout_settings = [
         [sg.Text('Parameters', font='Any 13')],
@@ -350,6 +353,11 @@ def make_ui():
             sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid)
         ],
         [sg.Button('Generate', size=(20,2), disabled=True), sg.ProgressBar(k='GenerateProgress', max_value=100, s=(30, 20), orientation='h')],
+        [sg.HSeparator()],
+        [sg.Text('Viewer Options', font='Any 13')],
+        [
+            sg.Checkbox('Auto-focus view on new image', key='_auto_focus', default=True),
+        ],
         ]
 
     layout_imageviewer = [
@@ -364,26 +372,28 @@ def make_ui():
             ThumbnailImage('hist6'), 
             ],
         [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
+        [sg.Text('Sample:', justification='r', size=(15,1), key='SampleInfo')]
     ]
 
     layout = [
         [sg.Col(layout_settings, p=0), sg.VSeparator(), sg.Col(layout_imageviewer, p=0)]
     ]
 
-    window = sg.Window('txt2img Interactive', layout, size=(1440,900))
+    window = sg.Window('txt2img Interactive', layout, size=(1440,900), finalize=True)
 
 
 
 
 sem_generate = threading.Semaphore(1)
 
+curr_sample_i = 0
 
 def ui_thread():
     global opt
-
+    global curr_sample_i
     make_ui()
 
-    imglist = []
+    datalist = []
     imgKeys = [
                 'hist0',
                 'hist1',
@@ -394,6 +404,29 @@ def ui_thread():
                 'hist6',
                 ]
     itercount = 0
+
+
+    def SetSampleAndInfo(index):
+        global curr_sample_i
+        if index < len(datalist) and index >= 0:
+            _img, _options, _samplenum = datalist[index]
+            window['SampleInfo'].update(f"Sample: seed {_options['seed']}:{_options['seed_offset']}, sample {_samplenum}.")
+            window['Image'].update(data=ImageTk.PhotoImage(_img))
+            curr_sample_i = index
+        else:
+            window['SampleInfo'].update('Sample: None')
+            window['Image'].update(data=None, size=(512,512))
+            
+        for i, imgKey in enumerate(imgKeys):
+            if i == curr_sample_i:
+                window[imgKey+'_f'].update(value="S")
+            else:
+                window[imgKey+'_f'].update(value="")
+
+
+
+    window.bind('<Right>', '-R-ARROW-')
+    window.bind('<Left>', '-L-ARROW-')
 
     while True:
 
@@ -425,26 +458,38 @@ def ui_thread():
 
 
         elif event == '-IMAGE-': # new image from backend event
-            imglist.insert(0, values[event])
-            for i, img in enumerate(imglist):
-                if i == 0: 
-                    window['Image'].update(data=ImageTk.PhotoImage(img))
-                elif i >= len(imgKeys):
+            datalist.insert(0, values[event])
+            for i, data in enumerate(datalist):
+                
+                if i >= len(imgKeys):
                     break
-                window[imgKeys[i]].update(data=ImageTk.PhotoImage(img.resize((64,64), resample=Image.Resampling.BICUBIC)))
+                window[imgKeys[i]].update(data=ImageTk.PhotoImage(data[0].resize((64,64), resample=Image.Resampling.BICUBIC)))
+            if values['_auto_focus']: 
+                SetSampleAndInfo(0)
+            else:
+                SetSampleAndInfo(curr_sample_i + 1)
 
         elif event in imgKeys: # clicked a thumbnail
-            i = imgKeys.index(event)
-            if len(imglist) > i:
-                window['Image'].update(data=ImageTk.PhotoImage(imglist[i]))
-        
+            _i = imgKeys.index(event)
+            SetSampleAndInfo(_i)
+
         elif event == '-ITER-':
 
             window['GenerateProgress'].update(current_count=values[event], max=opt.ddim_steps)
             
+        elif event == '-R-ARROW-':
+            i_attempt = max(0, min(len(datalist) - 1, curr_sample_i + 1))
+            SetSampleAndInfo(i_attempt)
+
+        elif event == '-L-ARROW-':
+            i_attempt = max(0, curr_sample_i - 1)
+            SetSampleAndInfo(i_attempt)
 
         if event == sg.WIN_CLOSED:
             os._exit(1)
+
+
+    
 
 
 
