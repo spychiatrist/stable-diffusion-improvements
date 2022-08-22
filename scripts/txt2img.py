@@ -1,6 +1,8 @@
 import argparse, os, sys, glob
+from ctypes import alignment
 from ast import arg
 import torch
+import hashlib as hl
 import numpy as np
 from omegaconf import OmegaConf
 from PIL import Image,ImageTk
@@ -372,7 +374,8 @@ def make_ui():
             ThumbnailImage('hist6'), 
             ],
         [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
-        [sg.Text('Sample:', justification='r', size=(15,1), key='SampleInfo')]
+        [sg.Text('Sample:', justification='r', size=(15,1), key='SampleInfo')],
+        [sg.Button('Save', size=(12,1), key='-SAVE-'), sg.Button('Save-All', size=(12,1), key='-SAVEALL-')],
     ]
 
     layout = [
@@ -423,10 +426,24 @@ def ui_thread():
             else:
                 window[imgKey+'_f'].update(value="")
 
+    def SaveImage(index):
+        _img, _options, _i = datalist[index]
+
+        if '_saved' in _options:
+            return
+        _options['_saved'] = True
+        prompthash = hl.sha256(bytes(_options['prompt'], 'utf-8')).hexdigest()
+        _path = os.path.join(_options['outdir'], "interactive", prompthash[:16])
+        os.makedirs(_path, exist_ok=True)
+        _file = os.path.join(_path, f"{_options['seed']:08}-{_options['seed_offset']:02}-{_i}.png")
+        _img.save(_file)
 
 
     window.bind('<Right>', '-R-ARROW-')
     window.bind('<Left>', '-L-ARROW-')
+    window.bind('<Escape>', '-ESC-')
+    window.bind('<Control-s>', '-SAVE-')
+    window.bind('<Control-S>', '-SAVEALL-')
 
     while True:
 
@@ -450,7 +467,7 @@ def ui_thread():
             itercount = 0
 
             window['Generate'].update(disabled=True)
-
+            window.force_focus()
             sem_generate.release()
 
         elif event == '-READY-':
@@ -477,13 +494,32 @@ def ui_thread():
 
             window['GenerateProgress'].update(current_count=values[event], max=opt.ddim_steps)
             
-        elif event == '-R-ARROW-':
-            i_attempt = max(0, min(len(datalist) - 1, curr_sample_i + 1))
-            SetSampleAndInfo(i_attempt)
+        elif event == '-SAVE-':
+            if len(datalist) > 0:
+                SaveImage(curr_sample_i)
 
-        elif event == '-L-ARROW-':
-            i_attempt = max(0, curr_sample_i - 1)
-            SetSampleAndInfo(i_attempt)
+                
+        elif event == '-SAVEALL-':
+            for i in reversed(range(0, len(datalist))):
+                SaveImage(i) #save in reverse order of history to get newest versions of overwrites last.
+
+        # events that can happen only with global focus (i.e. focus is not a textbox)
+        elif window.find_element_with_focus() == None:
+        
+            if event == '-R-ARROW-':
+                i_attempt = max(0, min(len(datalist) - 1, curr_sample_i + 1))
+                SetSampleAndInfo(i_attempt)
+
+            elif event == '-L-ARROW-':
+                i_attempt = max(0, curr_sample_i - 1)
+                SetSampleAndInfo(i_attempt)
+
+
+        elif event == '-ESC-':
+            window.force_focus()
+        
+        
+
 
         if event == sg.WIN_CLOSED:
             os._exit(1)
