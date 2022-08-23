@@ -375,7 +375,8 @@ def make_ui():
             ],
         [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
         [sg.Text('Sample:', justification='l', expand_x=True, size=(60,4), key='SampleInfo')],
-        [sg.Button('Clear All', size=(8,1), key='-CLEARALL-'), sg.Push(), sg.Button('Save', size=(12,1), key='-SAVE-'), sg.Button('Save-All', size=(12,1), key='-SAVEALL-')], 
+        [sg.Button('Clear All', size=(8,1), key='-CLEARALL-'),  sg.Push(), sg.Button('Save', size=(12,1), key='-SAVE-'), sg.Button('Save-All', size=(12,1), key='-SAVEALL-')], 
+        [sg.Button('Set Params', size=(8,1), key='-RESET-PARAMS-'), sg.Checkbox('Single-shot?', key='-RESET-PARAMS-SingleShot-', tooltip='Check this box to ignore prior sample num/iteration num in favor of 1.', default=True), sg.Push()]
     ]
 
     layout = [
@@ -444,6 +445,7 @@ def ui_thread():
     window.bind('<Right>', '-R-ARROW-')
     window.bind('<Left>', '-L-ARROW-')
     window.bind('<Escape>', '-ESC-')
+    window.bind('<Return>', 'Generate')
     window.bind('<Control-s>', '-SAVE-')
     window.bind('<Control-S>', '-SAVEALL-')
 
@@ -505,6 +507,20 @@ def ui_thread():
             for key in imgKeys:
                 window[key].update(data=ImageTk.PhotoImage(blankImg.resize((64,64), resample=Image.Resampling.BICUBIC)), size=(64,64))
             SetSampleAndInfo(0)
+
+        elif event == '-RESET-PARAMS-':
+
+            if len(datalist) > 0:
+                _, _opt, _samplenum = datalist[curr_sample_i]
+
+                window['prompt'      ].update(value=str(_opt['prompt'      ]))
+                window['seed'        ].update(value=str(_opt['seed'        ]))
+                window['seed_offset' ].update(value=str(_opt['seed_offset' ] + (_samplenum if values['-RESET-PARAMS-SingleShot-'] else 0)))
+                window['ddim_steps'  ].update(value=str(_opt['ddim_steps'  ]))
+                window['n_iter'      ].update(value=str(1 if values['-RESET-PARAMS-SingleShot-'] else _opt['n_iter'      ]))
+                window['n_samples'   ].update(value=str(1 if values['-RESET-PARAMS-SingleShot-'] else _opt['n_samples'   ]))
+                window['ddim_eta'    ].update(value=str(_opt['ddim_eta'    ]))
+                window['scale'       ].update(value=str(_opt['scale'       ]))
 
         elif event == '-SAVEALL-':
             for i in reversed(range(0, len(datalist))):
