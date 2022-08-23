@@ -16,6 +16,16 @@ The focus of this fork of [Stable Diffusion](https://github.com/CompVis/latent-d
 
 ![interactive_usagedemo](assets/gifs/usage.gif)
 
+## Disclaimer
+
+Some things to note which should be common sense, but by downloading these files you hereby agree:
+
+- I'm not responsible in any way for what you choose to generate with this, nor do I own any such product.
+  - Beware, certain model weights you download from various sources may be capable of producing disturbing imagery.
+  - You must read and understand the relevant license of any model you use.
+- This is a hacked-together work-in-progress.  
+  - Expect things to break.  Frequently.
+  - Be kind and collaborative in discussions online about Stable Diffusion, and other similar tools.
   
 ## Installation
 
@@ -36,7 +46,9 @@ conda env create -f environment.yaml
 conda activate ldm
 ```
 
-Place your obtained `model.ckpt` file in new folder: `.\stable-diffusion-improvements\models\ldm\stable-diffusion-v1`
+Place your obtained `model.ckpt` file in new folder: `.\stable-diffusion-improvements\models\ldm\stable-diffusion-v1`  
+
+If it's not named `model.ckpt`, and is instead something like `sd-v1-4.ckpt`, just rename it.
 
 ## Usage
 
