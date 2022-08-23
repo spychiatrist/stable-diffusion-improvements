@@ -342,23 +342,24 @@ def make_ui():
 
     layout_settings = [
         [sg.Text('Parameters', font='Any 13')],
-        [TextLabel('Prompt'), sg.Input(key='prompt', default_text=opt.prompt)],
-        [TextLabel('Seed'), sg.Input(key='seed', default_text=opt.seed)],
-        [TextLabel('Seed Sampler Offset'), sg.Input(key='seed_offset', default_text=opt.seed_offset)],
-        [TextLabel('Sampler Substeps'), sg.Input(key='ddim_steps', default_text=opt.ddim_steps)],
-        [TextLabel('Iterations'), sg.Input(key='n_iter', default_text=opt.n_iter)],
-        [TextLabel('Samples'), sg.Input(key='n_samples', default_text=opt.n_samples)],
-        [TextLabel('Guidance Scale'), sg.Input(key='scale', default_text=opt.scale)],
+        [TextLabel('Prompt'), sg.Input(key='prompt', default_text=opt.prompt, tooltip='Description of the image you would like to see.')],
+        [TextLabel('Seed'), sg.Input(key='seed', default_text=opt.seed, tooltip='Seed for first image generation.')],
+        [TextLabel('Seed Sampler Offset'), sg.Input(key='seed_offset', default_text=opt.seed_offset, tooltip='Numeric offset into batch.  Effectively, number of samples to skip. \
+ Useful if you want to re-run a single image generation nested within a sample batch.')],
+        [TextLabel('Sampler Substeps'), sg.Input(key='ddim_steps', default_text=opt.ddim_steps, tooltip='Number of substeps per batch.')],
+        [TextLabel('Iterations'), sg.Input(key='n_iter', default_text=opt.n_iter, tooltip='Number of batches per generation.')],
+        [TextLabel('Samples'), sg.Input(key='n_samples', default_text=opt.n_samples, tooltip='Number of samples per batch.')],
+        [TextLabel('Guidance Scale'), sg.Input(key='scale', default_text=opt.scale, tooltip='Unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))')],
         [TextLabel('Sampler Eta'), sg.Input(key='ddim_eta', default_text=opt.ddim_eta)],
         [
-            sg.Checkbox('Skip Sample Save',key='skip_save', default=opt.skip_save),
-            sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid)
+            sg.Checkbox('Skip Sample Save',key='skip_save', default=opt.skip_save, tooltip='If checked, program will not save each sample automatically.'),
+            sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid, tooltip='If checked, program will not save grid collages of each batch.')
         ],
         [sg.Button('Generate', size=(20,2), disabled=True), sg.ProgressBar(k='GenerateProgress', max_value=100, s=(30, 20), orientation='h')],
         [sg.HSeparator()],
         [sg.Text('Viewer Options', font='Any 13')],
         [
-            sg.Checkbox('Auto-focus view on new image', key='_auto_focus', default=True),
+            sg.Checkbox('Auto-focus', key='_auto_focus', default=True, tooltip='Whether or not to set the image viewer\'s focus to fresh images as they are generated.'),
         ],
         ]
 
@@ -376,7 +377,10 @@ def make_ui():
         [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
         [sg.Text('Sample:', justification='l', expand_x=True, size=(60,4), key='SampleInfo')],
         [sg.Button('Clear All', size=(8,1), key='-CLEARALL-'),  sg.Push(), sg.Button('Save', size=(12,1), key='-SAVE-'), sg.Button('Save-All', size=(12,1), key='-SAVEALL-')], 
-        [sg.Button('Set Params', size=(8,1), key='-RESET-PARAMS-'), sg.Checkbox('Single-shot?', key='-RESET-PARAMS-SingleShot-', tooltip='Check this box to ignore prior sample num/iteration num in favor of 1.', default=True), sg.Push()]
+        [
+            sg.Button('Set Params', size=(8,1), key='-RESET-PARAMS-', tooltip='Set the generation parameters (on the left) to whatever generated the image shown.'), 
+            sg.Checkbox('Single-shot?', key='-RESET-PARAMS-SingleShot-', tooltip='Check this box to ignore prior sample num/iteration num in favor of 1.', default=True), sg.Push()
+        ]
     ]
 
     layout = [
