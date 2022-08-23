@@ -13,6 +13,9 @@ The focus of this fork of [Stable Diffusion](https://github.com/CompVis/latent-d
 3. **Usability**
    - Accessibility through UI
    - More concise and fool-proof installation
+
+![interactive_usagedemo](assets/gifs/usage.gif)
+
   
 ## Installation
 
