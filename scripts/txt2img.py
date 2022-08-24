@@ -361,6 +361,7 @@ def make_ui():
         [
             sg.Checkbox('Auto-focus', key='_auto_focus', default=True, tooltip='Whether or not to set the image viewer\'s focus to fresh images as they are generated.'),
         ],
+        [sg.VPush()],
         ]
 
     layout_imageviewer = [
@@ -373,14 +374,21 @@ def make_ui():
             ThumbnailImage('hist4'), 
             ThumbnailImage('hist5'), 
             ThumbnailImage('hist6'), 
+            sg.Text('', size=(4,1), justification='l', key='ThumbOverflowText'),
             ],
         [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
         [sg.Text('Sample:', justification='l', expand_x=True, size=(60,4), key='SampleInfo')],
-        [sg.Button('Clear All', size=(8,1), key='-CLEARALL-'),  sg.Push(), sg.Button('Save', size=(12,1), key='-SAVE-'), sg.Button('Save-All', size=(12,1), key='-SAVEALL-')], 
+        [
+            sg.Button('Clear All', size=(8,1), key='-CLEARALL-', tooltip='Clears sample viewer history.  If samples are not saved to disk, this will permanently erase them.'), 
+            sg.Button('Clear (Del)', size=(8,1), key='-CLEAR-', tooltip='Clears currently viewed sample.'),  
+            sg.Push(), 
+            sg.Button('Save', size=(12,1), key='-SAVE-', tooltip='Save currently viewed sample.'), 
+            sg.Button('Save-All', size=(12,1), key='-SAVEALL-', tooltip='Save all samples in history, even those overflowing the thumbnail history.')
+        ],
         [
             sg.Button('Set Params', size=(8,1), key='-RESET-PARAMS-', tooltip='Set the generation parameters (on the left) to whatever generated the image shown.'), 
             sg.Checkbox('Single-shot?', key='-RESET-PARAMS-SingleShot-', tooltip='Check this box to ignore prior sample num/iteration num in favor of 1.', default=True), sg.Push()
-        ]
+        ],
     ]
 
     layout = [
@@ -445,11 +453,27 @@ def ui_thread():
         _file = os.path.join(_path, f"{_options['seed']:08}-{_options['seed_offset']:02}-{_i}.png")
         _img.save(_file)
 
+    def UpdateThumbnails():
+        for i, k in enumerate(imgKeys):
+            data = blankImg.resize((64,64), resample=Image.Resampling.BICUBIC)
+            if i < len(datalist):
+                data=datalist[i][0].resize((64,64), resample=Image.Resampling.BICUBIC)
+            window[k].update(data=ImageTk.PhotoImage(data))
+
+        nThumbs = len(imgKeys)
+        nData = len(datalist)
+        if nData <= nThumbs:
+            window['ThumbOverflowText'].update(value='')
+        else:
+            window['ThumbOverflowText'].update(value=f'+{nData - nThumbs}')
+
+
 
     window.bind('<Right>', '-R-ARROW-')
     window.bind('<Left>', '-L-ARROW-')
     window.bind('<Escape>', '-ESC-')
     window.bind('<Return>', 'Generate')
+    window.bind('<Delete>', '-CLEAR-')
     window.bind('<Control-s>', '-SAVE-')
     window.bind('<Control-S>', '-SAVEALL-')
 
@@ -484,11 +508,7 @@ def ui_thread():
 
         elif event == '-IMAGE-': # new image from backend event
             datalist.insert(0, values[event])
-            for i, data in enumerate(datalist):
-                
-                if i >= len(imgKeys):
-                    break
-                window[imgKeys[i]].update(data=ImageTk.PhotoImage(data[0].resize((64,64), resample=Image.Resampling.BICUBIC)))
+            UpdateThumbnails()
             if values['_auto_focus']: 
                 SetSampleAndInfo(0)
             else:
@@ -508,9 +528,15 @@ def ui_thread():
 
         elif event == '-CLEARALL-':
             datalist.clear()
-            for key in imgKeys:
-                window[key].update(data=ImageTk.PhotoImage(blankImg.resize((64,64), resample=Image.Resampling.BICUBIC)), size=(64,64))
+            UpdateThumbnails()
             SetSampleAndInfo(0)
+
+        elif event == '-CLEAR-':
+            if curr_sample_i < len(datalist):
+                del datalist[curr_sample_i]
+                UpdateThumbnails()
+                window.write_event_value('-L-ARROW-', None)
+
 
         elif event == '-RESET-PARAMS-':
 
