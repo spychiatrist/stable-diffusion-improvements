@@ -1,4 +1,5 @@
 import argparse, os, sys, glob
+import json
 from ctypes import alignment
 from ast import arg
 import torch
@@ -6,6 +7,7 @@ import hashlib as hl
 import numpy as np
 from omegaconf import OmegaConf
 from PIL import Image,ImageTk
+from PIL.PngImagePlugin import PngInfo
 import PySimpleGUI as sg
 import tkinter as tk
 import threading
@@ -384,6 +386,7 @@ def make_ui():
             sg.Button('Clear All', size=(8,1), key='-CLEARALL-', tooltip='Clears sample viewer history.  If samples are not saved to disk, this will permanently erase them.'), 
             sg.Button('Clear (Del)', size=(8,1), key='-CLEAR-', tooltip='Clears currently viewed sample.'),  
             sg.Push(), 
+            sg.Checkbox('Embed params', key='-SAVE-Embed-', tooltip='Whether to embed parameters in the metadata of saved images. Required for reloading saved images in this viewer.', default=True),
             sg.Button('Save', size=(12,1), key='-SAVE-', tooltip='Save currently viewed sample.'), 
             sg.Button('Save-All', size=(12,1), key='-SAVEALL-', tooltip='Save all samples in history, even those overflowing the thumbnail history.')
         ],
@@ -391,6 +394,7 @@ def make_ui():
             sg.Button('Set Params', size=(8,1), key='-RESET-PARAMS-', tooltip='Set the generation parameters (on the left) to whatever generated the image shown.'), 
             sg.Checkbox('Single-shot?', key='-RESET-PARAMS-SingleShot-', tooltip='Check this box to ignore prior sample num/iteration num in favor of 1.', default=True), sg.Push()
         ],
+        [sg.Push(), sg.FileBrowse(k='FileOpen', target='FileOpen', change_submits=True)],
     ]
 
     layout = [
@@ -425,6 +429,8 @@ def ui_thread():
 
     blankImg = Image.new('RGB', (512, 512), sg.theme_button_color()[1])
 
+    blankImg.info
+
     def SetSampleAndInfo(index):
         global curr_sample_i
         if index < len(datalist) and index >= 0:
@@ -455,7 +461,22 @@ def ui_thread():
         _path = os.path.join(_options['outdir'], "interactive", prompthash[:16])
         os.makedirs(_path, exist_ok=True)
         _file = os.path.join(_path, f"{_options['seed']:08}-{_options['seed_offset']:02}-{_i}.png")
-        _img.save(_file)
+
+        metadata = PngInfo()
+        metadata.add_text("sdParams", json.dumps(_options))
+        metadata.add_text("sdSubsample", str(_i))
+
+        if values['-SAVE-Embed-']:
+            _img.save(_file, pnginfo=metadata)
+        else:
+            _img.save(_file)
+
+    def LoadImage(path):
+        _img = Image.open(path)
+        _options = json.loads(_img.text['sdParams'])
+        _i = int(_img.text['sdSubsample'])
+        _metadata = (_img, _options, _i)
+        window.write_event_value("-IMAGE-", _metadata)
 
     def UpdateThumbnails():
         for i, k in enumerate(imgKeys):
@@ -531,6 +552,9 @@ def ui_thread():
         elif event == '-SAVE-':
             if len(datalist) > 0:
                 SaveImage(curr_sample_i)
+        
+        elif event == 'FileOpen':
+            LoadImage(values['FileOpen'])
 
         elif event == '-CLEARALL-':
             datalist.clear()
