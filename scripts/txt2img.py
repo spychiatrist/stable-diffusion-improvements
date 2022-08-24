@@ -338,7 +338,7 @@ def make_ui():
     def TextLabel(text): return sg.Text(text+':', justification='r', size=(15,1))
     def ThumbnailImage(key): 
         _l = [[sg.Image(size=(64,64), subsample=4, key=key, p=2, background_color=sg.theme_background_color(), enable_events=True)]]
-        return sg.Frame("", _l, p=1, background_color=sg.theme_button_color()[1], key=key+'_f' )
+        return sg.Frame(" ", _l, p=1, background_color=sg.theme_button_color()[1], key=key+'_f' )
 
     layout_settings = [
         [sg.Text('Parameters', font='Any 13')],
@@ -374,7 +374,9 @@ def make_ui():
             ThumbnailImage('hist4'), 
             ThumbnailImage('hist5'), 
             ThumbnailImage('hist6'), 
-            sg.Text('', size=(4,1), justification='l', key='ThumbOverflowText'),
+            sg.Frame(" ", 
+                [[sg.VPush()],[sg.Push(), sg.Text('', size=(4,1), justification='l', key='ThumbOverflowText'), sg.Push()],[sg.VPush()],], 
+                expand_x=True, expand_y=True, p=1, background_color=sg.theme_button_color()[1], key='ThumbOverflowText_f', s=(68, 68) ),
             ],
         [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
         [sg.Text('Sample:', justification='l', expand_x=True, size=(60,4), key='SampleInfo')],
@@ -433,12 +435,14 @@ def ui_thread():
         else:
             window['SampleInfo'].update('Sample: None')
             window['Image'].update(data=ImageTk.PhotoImage(blankImg), size=(512,512))
-            
+        
+        window['ThumbOverflowText_f'].update(value="S")
         for i, imgKey in enumerate(imgKeys):
             if i == curr_sample_i:
                 window[imgKey+'_f'].update(value="S")
+                window['ThumbOverflowText_f'].update(value=" ")
             else:
-                window[imgKey+'_f'].update(value="")
+                window[imgKey+'_f'].update(value=" ")
 
 
     def SaveImage(index):
@@ -469,6 +473,8 @@ def ui_thread():
 
 
 
+    window.bind('<Up>', '-U-ARROW-')
+    window.bind('<Down>', '-D-ARROW-')
     window.bind('<Right>', '-R-ARROW-')
     window.bind('<Left>', '-L-ARROW-')
     window.bind('<Escape>', '-ESC-')
@@ -558,7 +564,33 @@ def ui_thread():
 
         # events that can happen only with global focus (i.e. focus is not a textbox)
         elif window.find_element_with_focus() == None:
-        
+            
+            def opts_eq(d1, d2):
+                _, _o1, _sn1 = d1
+                _, _o2, _sn2 = d2
+                def _cmp_key(key):
+                    return _o1[key] == _o2[key]
+                if not (_cmp_key('seed') and _cmp_key('seed_offset') and _sn1 == _sn2):
+                    return False
+                return _cmp_key('prompt')
+                    
+
+            if event == '-D-ARROW-':
+                #Search forward for next previous sample with matching settings
+                curr_data = datalist[curr_sample_i]
+                for i, data in enumerate(datalist[curr_sample_i+1:]):
+                    if opts_eq(curr_data, data):
+                        SetSampleAndInfo(curr_sample_i + 1 + i)
+                        break
+
+            if event == '-U-ARROW-':
+                if curr_sample_i > 0:
+                    curr_data = datalist[curr_sample_i]
+                    for i, data in enumerate(datalist[curr_sample_i-1::-1]):
+                        if opts_eq(curr_data, data):
+                            SetSampleAndInfo(curr_sample_i - 1 - i)
+                            break
+
             if event == '-R-ARROW-':
                 i_attempt = max(0, min(len(datalist) - 1, curr_sample_i + 1))
                 SetSampleAndInfo(i_attempt)
