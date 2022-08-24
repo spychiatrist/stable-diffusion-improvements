@@ -337,6 +337,8 @@ def make_ui():
     global window
     print("Starting UI...")
 
+    programName = 'Stable Diffusion Interactive'
+
     def TextLabel(text): return sg.Text(text+':', justification='r', size=(15,1))
     def ThumbnailImage(key): 
         _l = [[sg.Image(size=(64,64), subsample=4, key=key, p=2, background_color=sg.theme_button_color()[1], enable_events=True)]]
@@ -399,13 +401,14 @@ def make_ui():
     ]
 
     layout = [
-        [sg.Frame('Generation Parameters', layout=layout_settings, vertical_alignment='top', p=0), sg.VSeparator(), sg.Frame('Sample Browser', layout=layout_imageviewer, p=0)]
+        [sg.Frame('Generation Parameters', layout=layout_settings, vertical_alignment='top', p=0), sg.VSeparator(), sg.Frame('Sample Browser', layout=layout_imageviewer, p=0)],
+        [sg.StatusBar(f'Welcome to {programName}', expand_x=True, key='StatusBar')]
     ]
 
-    window = sg.Window('txt2img Interactive', layout, finalize=True)
+    window = sg.Window(programName, layout, finalize=True)
 
 
-
+sbar_colors = {'l': sg.theme_text_color(), 'w': '#a6943c', 'e': '#b03e3e',}
 
 sem_generate = threading.Semaphore(1)
 
@@ -414,6 +417,7 @@ curr_sample_i = 0
 def ui_thread():
     global opt
     global curr_sample_i
+    global window
     make_ui()
 
     datalist = []
@@ -429,6 +433,9 @@ def ui_thread():
     itercount = 0
 
     blankImg = Image.new('RGB', (512, 512), sg.theme_button_color()[1])
+
+    def LogStatusBar(msg:str, level:str='i'):
+        window['StatusBar'].update(value=msg, text_color=sbar_colors[level])
 
     def SetSampleAndInfo(index):
         global curr_sample_i
@@ -467,12 +474,15 @@ def ui_thread():
             metadata.add_text("sdParams", json.dumps(_options))
             metadata.add_text("sdSubsample", str(_i))
 
-        metadata.add_test('sd_interactive', 'Made with Stable Diffusion Interactive.  See https://github.com/spychiatrist/stable-diffusion-improvements')
+        metadata.add_text('sd_interactive', 'Made with Stable Diffusion Interactive.  See https://github.com/spychiatrist/stable-diffusion-improvements')
 
         _img.save(_file, pnginfo=metadata)
 
     def LoadImage(path):
         _img = Image.open(path)
+        if 'sdParams' not in _img.text:
+            LogStatusBar('Image lacks parameters metadata.  Select \'Embed params\' when saving outputs from this program.', 'e')
+            return
         _options = json.loads(_img.text['sdParams'])
         _i = int(_img.text['sdSubsample'])
         _metadata = (_img, _options, _i)
