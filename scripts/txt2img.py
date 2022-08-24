@@ -339,11 +339,11 @@ def make_ui():
 
     def TextLabel(text): return sg.Text(text+':', justification='r', size=(15,1))
     def ThumbnailImage(key): 
-        _l = [[sg.Image(size=(64,64), subsample=4, key=key, p=2, background_color=sg.theme_background_color(), enable_events=True)]]
+        _l = [[sg.Image(size=(64,64), subsample=4, key=key, p=2, background_color=sg.theme_button_color()[1], enable_events=True)]]
         return sg.Frame(" ", _l, p=1, background_color=sg.theme_button_color()[1], key=key+'_f' )
 
     layout_settings = [
-        [sg.Text('Parameters', font='Any 13')],
+        # [sg.Text('Parameters', font='Any 13')],
         [TextLabel('Prompt'), sg.Input(key='prompt', default_text=opt.prompt, tooltip='Description of the image you would like to see.')],
         [TextLabel('Seed'), sg.Input(key='seed', default_text=opt.seed, tooltip='Seed for first image generation.')],
         [TextLabel('Seed Sampler Offset'), sg.Input(key='seed_offset', default_text=opt.seed_offset, tooltip='Numeric offset into batch.  Effectively, number of samples to skip. \
@@ -367,7 +367,7 @@ def make_ui():
         ]
 
     layout_imageviewer = [
-        [sg.Text('Results', font='Any 13')],
+        # [sg.Text('Results', font='Any 13')],
         [
             ThumbnailImage('hist0'), 
             ThumbnailImage('hist1'), 
@@ -377,9 +377,10 @@ def make_ui():
             ThumbnailImage('hist5'), 
             ThumbnailImage('hist6'), 
             sg.Frame(" ", 
-                [[sg.VPush()],[sg.Push(), sg.Text('', size=(4,1), justification='l', key='ThumbOverflowText'), sg.Push()],[sg.VPush()],], 
-                expand_x=True, expand_y=True, p=1, background_color=sg.theme_button_color()[1], key='ThumbOverflowText_f', s=(68, 68) ),
+                [[sg.Text('', size=(4,1), justification='l', key='ThumbOverflowText')]], 
+                expand_x=True, expand_y=True, p=1, background_color=sg.theme_button_color()[1], key='ThumbOverflowText_f', s=(68, 68) , vertical_alignment='center', element_justification='center'),
             ],
+        [sg.HSeparator()],
         [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
         [sg.Text('Sample:', justification='l', expand_x=True, size=(60,4), key='SampleInfo')],
         [
@@ -398,10 +399,10 @@ def make_ui():
     ]
 
     layout = [
-        [sg.Col(layout_settings, p=0), sg.VSeparator(), sg.Col(layout_imageviewer, p=0)]
+        [sg.Frame('Generation Parameters', layout=layout_settings, vertical_alignment='top', p=0), sg.VSeparator(), sg.Frame('Sample Browser', layout=layout_imageviewer, p=0)]
     ]
 
-    window = sg.Window('txt2img Interactive', layout, size=(1440,900), finalize=True)
+    window = sg.Window('txt2img Interactive', layout, finalize=True)
 
 
 
@@ -503,6 +504,10 @@ def ui_thread():
     window.bind('<Delete>', '-CLEAR-')
     window.bind('<Control-s>', '-SAVE-')
     window.bind('<Control-S>', '-SAVEALL-')
+
+    UpdateThumbnails()
+
+    SetSampleAndInfo(0)
 
     while True:
 
