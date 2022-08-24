@@ -430,8 +430,6 @@ def ui_thread():
 
     blankImg = Image.new('RGB', (512, 512), sg.theme_button_color()[1])
 
-    blankImg.info
-
     def SetSampleAndInfo(index):
         global curr_sample_i
         if index < len(datalist) and index >= 0:
@@ -464,13 +462,14 @@ def ui_thread():
         _file = os.path.join(_path, f"{_options['seed']:08}-{_options['seed_offset']:02}-{_i}.png")
 
         metadata = PngInfo()
-        metadata.add_text("sdParams", json.dumps(_options))
-        metadata.add_text("sdSubsample", str(_i))
 
         if values['-SAVE-Embed-']:
-            _img.save(_file, pnginfo=metadata)
-        else:
-            _img.save(_file)
+            metadata.add_text("sdParams", json.dumps(_options))
+            metadata.add_text("sdSubsample", str(_i))
+
+        metadata.add_test('sd_interactive', 'Made with Stable Diffusion Interactive.  See https://github.com/spychiatrist/stable-diffusion-improvements')
+
+        _img.save(_file, pnginfo=metadata)
 
     def LoadImage(path):
         _img = Image.open(path)
