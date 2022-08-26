@@ -1,6 +1,8 @@
     
 - [ ] k_lms & friends (`https://github.com/lstein/k-diffusion.git@master#egg=k-diffusion`)
-- [ ] differential param modulation by functions (UI or text) (multidim, improved grid)
+- [ ] differential param modulation by functions (UI or text)
+  - [ ] improved grid
+  - [ ] auto axis-labeling
 - [ ] auto-increment seed/random next seed
 - [ ] img2img direct tab
 - [ ] fully decoupled relaunch w/ modified models
