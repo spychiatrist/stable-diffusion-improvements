@@ -19,6 +19,7 @@ dependencies:
     - omegaconf==2.1.1
     - test-tube>=0.7.5
     - streamlit>=0.73.1
+    - pillow==9.2.0
     - einops==0.3.0
     - torch-fidelity==0.3.0
     - transformers==4.19.2
@@ -27,4 +28,5 @@ dependencies:
     - pysimplegui
     - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
     - -e git+https://github.com/openai/CLIP.git@main#egg=clip
+    - -e git+https://github.com/lstein/k-diffusion.git@master#egg=k-diffusion
     - -e .
