@@ -19,6 +19,7 @@ import time
 from pytorch_lightning import seed_everything
 from torch import autocast
 from contextlib import contextmanager, nullcontext
+from itertools import product
 
 from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
@@ -29,7 +30,7 @@ from ldm.simplet2i import T2I
 
 opt = None
 
-window = None
+window:sg.Window = None
 
 def main():
     global opt
@@ -52,22 +53,31 @@ def make_ui():
 
     programName = 'Stable Diffusion Interactive'
 
+    sampler_choices = ['k_lms', 'k_euler_a', 'ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_euler', 'k_heun', 'plms']
     def TextLabel(text): return sg.Text(text+':', justification='r', size=(15,1))
     def ThumbnailImage(key): 
         _l = [[sg.Image(size=(64,64), subsample=4, key=key, p=2, background_color=sg.theme_button_color()[1], enable_events=True)]]
         return sg.Frame(" ", _l, p=1, background_color=sg.theme_button_color()[1], key=key+'_f' )
 
+    l_to_block_focus = []
+
+    def GroupCheckbox(base_key, default:bool):
+        cb = sg.Checkbox('', key='g_'+base_key, default=default, tooltip='Group by (for up/down instance navigation)')
+        l_to_block_focus.append(cb)
+        return cb
+
     layout_settings = [
         # [sg.Text('Parameters', font='Any 13')],
-        [TextLabel('Prompt'), sg.Input(key='prompt', default_text=opt.prompt, tooltip='Description of the image you would like to see.')],
-        [TextLabel('Seed'), sg.Input(key='seed', default_text=opt.seed, tooltip='Seed for first image generation.')],
+        [TextLabel('Sampler'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' )],
+        [TextLabel('Prompt'), sg.Input(key='prompt', default_text=opt.prompt, tooltip='Description of the image you would like to see.'), GroupCheckbox('prompt', True)],
+        [TextLabel('Seed'), sg.Input(key='seed', default_text=opt.seed, tooltip='Seed for first image generation.'), GroupCheckbox('seed', True)],
         [TextLabel('Seed Sampler Offset'), sg.Input(key='seed_offset', default_text=opt.seed_offset, tooltip='Numeric offset into batch.  Effectively, number of samples to skip. \
- Useful if you want to re-run a single image generation nested within a sample batch.')],
-        [TextLabel('Sampler Substeps'), sg.Input(key='ddim_steps', default_text=opt.ddim_steps, tooltip='Number of substeps per batch.')],
+ Useful if you want to re-run a single image generation nested within a sample batch.'), GroupCheckbox('seed_offset', True)],
+        [TextLabel('Sampler Substeps'), sg.Input(key='ddim_steps', default_text=opt.ddim_steps, tooltip='Number of substeps per batch.'), GroupCheckbox('ddim_steps', False)],
+        [TextLabel('Guidance Scale'), sg.Input(key='scale', default_text=opt.scale, tooltip='Unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))'), GroupCheckbox('scale', False)],
         [TextLabel('Iterations'), sg.Input(key='n_iter', default_text=opt.n_iter, tooltip='Number of batches per generation.')],
         [TextLabel('Samples'), sg.Input(key='n_samples', default_text=opt.n_samples, tooltip='Number of samples per batch.')],
-        [TextLabel('Guidance Scale'), sg.Input(key='scale', default_text=opt.scale, tooltip='Unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))')],
-        [TextLabel('Sampler Eta'), sg.Input(key='ddim_eta', default_text=opt.ddim_eta)],
+        [TextLabel('Sampler Eta'), sg.Input(key='ddim_eta', default_text=opt.ddim_eta, disabled=True)],
         [
             sg.Checkbox('Skip Sample Save',key='skip_save', default=opt.skip_save, tooltip='If checked, program will not save each sample automatically.'),
             sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid, tooltip='If checked, program will not save grid collages of each batch.')
@@ -77,6 +87,7 @@ def make_ui():
         [sg.Text('Viewer Options', font='Any 13')],
         [
             sg.Checkbox('Auto-focus', key='_auto_focus', default=True, tooltip='Whether or not to set the image viewer\'s focus to fresh images as they are generated.'),
+            sg.Checkbox('Visualize Substeps (Slow)', key='_visualize_sub', default=False, tooltip='Whether or not to set the image viewer\'s focus to fresh images as they are generated.'),
         ],
         [sg.VPush()],
         ]
@@ -119,6 +130,10 @@ def make_ui():
     ]
 
     window = sg.Window(programName, layout, finalize=True)
+
+    for cb in l_to_block_focus:
+        cb.block_focus(True)
+
     return window
 
 
@@ -214,8 +229,44 @@ def ui_thread(window:sg.Window):
         else:
             window['ThumbOverflowText'].update(value=f'+{nData - nThumbs}')
 
+    def SetThreadActionsDisabled(disabled:bool=False):
+        window['Generate'].update(disabled=disabled)
+        window['SamplerCombo'].update(disabled=disabled)
+        window.force_focus()
+
+    def GenerateYield():
+        opt.prompt =        values['prompt']
+        opt.skip_grid =       values['skip_grid']
+        opt.skip_save =       values['skip_save']
+        opt._visualize_sub =  values['_visualize_sub']
+        opt.n_iter =        int(values['n_iter'])
+        opt.n_samples =     int(values['n_samples'])
+        opt.seed_offset =   int(values['seed_offset'])
+
+        l_scale =           ParseNumericParam( (values['scale']), float)
+        l_ddim_eta =        ParseNumericParam( (values['ddim_eta']), float)
+        l_ddim_steps =      ParseNumericParam( (values['ddim_steps']), int)
+        l_seed =            ParseNumericParam( (values['seed']), int)
+        
+        perm_iterator = product(l_scale, l_ddim_eta, l_ddim_steps, l_seed)
+
+        for opt_it in perm_iterator:
+            opt.scale, opt.ddim_eta, opt.ddim_steps, opt.seed = opt_it
+            sem_generate.release()      
+            yield
 
 
+    def ParseNumericParam(input:str, castfn): 
+        s = input.split(':')
+        if len(s) == 2:
+            s1 = s[1].split('(')
+            if len(s1) == 2:
+                s1[1] = s1[1].strip(')')
+                base = castfn(s[0])
+                iters = int(s1[0])
+                offset = castfn(s1[1])
+                return [base + i*offset for i in range(iters)]
+        return [castfn(s[0])]
     window.bind('<Up>', '-U-ARROW-')
     window.bind('<Down>', '-D-ARROW-')
     window.bind('<Right>', '-R-ARROW-')
@@ -230,33 +281,35 @@ def ui_thread(window:sg.Window):
 
     SetSampleAndInfo(0)
 
+    generator_params_yield = None
+
     while True:
 
         event, values = window.read()
 
         if event == 'Generate': # generate button event
-            opt.prompt =        values['prompt']
+            generator_params_yield = GenerateYield()
+            SetThreadActionsDisabled(True)
+            next(generator_params_yield)
 
-            opt.seed =          int(values['seed'])
-            opt.seed_offset =   int(values['seed_offset'])
-            opt.ddim_steps =    int(values['ddim_steps'])
-            opt.n_iter =        int(values['n_iter'])
-            opt.n_samples =     int(values['n_samples'])
-
-            opt.ddim_eta =      float(values['ddim_eta'])
-            opt.scale =         float(values['scale'])
-
-            opt.skip_grid =     values['skip_grid']
-            opt.skip_save =     values['skip_save']
-
-            itercount = 0
-
-            window['Generate'].update(disabled=True)
-            window.force_focus()
-            sem_generate.release()
 
         elif event == '-READY-':
-            window['Generate'].update(disabled=False)
+            if generator_params_yield != None:
+                try:
+                    next(generator_params_yield)
+                except StopIteration:
+                    generator_params_yield = None
+                    SetThreadActionsDisabled(False)
+            else:
+                SetThreadActionsDisabled(False)  
+
+        elif event == 'SamplerCombo':
+            opt.sampler = values[event]
+            opt.change_model = True
+
+            SetThreadActionsDisabled(True)
+            sem_generate.release()
+
 
 
         elif event == '-IMAGE-': # new image from backend event
@@ -272,9 +325,12 @@ def ui_thread(window:sg.Window):
             SetSampleAndInfo(_i)
 
         elif event == '-ITER-':
-            _x0, _i = values[event]
-            # TODO: animate substepping
-            window['GenerateProgress'].update(current_count=_i, max=opt.ddim_steps)
+            imgs, _i = values[event]
+            if values['_visualize_sub']: 
+                #for img in imgs:
+                window['Image'].update(data=ImageTk.PhotoImage(imgs[0]))
+
+            window['GenerateProgress'].update(current_count=_i, max=opt.ddim_steps-1)
             
         elif event == '-SAVE-':
             if len(datalist) > 0:
@@ -309,6 +365,10 @@ def ui_thread(window:sg.Window):
                 window['ddim_eta'    ].update(value=str(_opt['ddim_eta'    ]))
                 window['scale'       ].update(value=str(_opt['scale'       ]))
 
+                if values['SamplerCombo'] != _opt['sampler']:
+                    window['SamplerCombo'].update( value=_opt['sampler'])
+                    window.write_event_value('SamplerCombo', _opt['sampler'])
+
         elif event == '-SAVEALL-':
             for i in reversed(range(0, len(datalist))):
                 SaveImage(i) #save in reverse order of history to get newest versions of overwrites last.
@@ -321,9 +381,12 @@ def ui_thread(window:sg.Window):
                 _, _o2, _sn2 = d2
                 def _cmp_key(key):
                     return _o1[key] == _o2[key]
-                if not (_cmp_key('seed') and _cmp_key('seed_offset') and _sn1 == _sn2):
-                    return False
-                return _cmp_key('prompt')
+                if values['g_seed'       ] and not  _cmp_key('seed'                         ): return False
+                if values['g_seed_offset'] and not (_cmp_key('seed_offset') and _sn1 == _sn2): return False
+                if values['g_ddim_steps' ] and not  _cmp_key('ddim_steps'                   ): return False
+                if values['g_scale'      ] and not  _cmp_key('scale'                        ): return False
+                if values['g_prompt'     ] and not  _cmp_key('prompt'                       ): return False
+                return True
                     
 
             if event == '-D-ARROW-':
@@ -378,11 +441,19 @@ def backend_loop():
     )
 
     t2i.load_model()
+    
+    opt.change_model = False
 
     while True:
         #await mutex to proceed
         window.write_event_value("-READY-", None)
         sem_generate.acquire()
+
+        if opt.change_model:
+            t2i.sampler_name = opt.sampler
+            t2i._set_sampler()
+            opt.change_model = False
+            continue
 
         os.makedirs(opt.outdir, exist_ok=True)
         outpath = opt.outdir
@@ -393,7 +464,10 @@ def backend_loop():
 
 
         def substep_callback( x0,  i ):
-            window.write_event_value('-ITER-', (x0, i))
+            imgs = None
+            if opt._visualize_sub:
+                imgs = t2i._samples_to_images(x0)
+            window.write_event_value('-ITER-', (imgs, i))
 
         def iter_callback(img:Image, seed, i):
             opt.seed=seed
