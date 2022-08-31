@@ -63,7 +63,7 @@ class KSampler(object):
     ):
         def route_callback(k_callback_values):
             if img_callback is not None:
-                img_callback(k_callback_values['x'], k_callback_values['i'])
+                img_callback(k_callback_values['denoised'], k_callback_values['i'])
 
         sigmas = self.model.get_sigmas(S)
         if x_T:
