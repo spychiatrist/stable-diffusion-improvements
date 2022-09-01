@@ -629,7 +629,7 @@ class T2I:
 
 
         w, h = image.size
-        # print(f'loaded input image of size ({w}, {h}) from {path}')
+        print(f'loaded input image of size ({w}, {h})')
         w, h = map(
             lambda x: x - x % 32, (w, h)
         )  # resize to integer multiple of 32
