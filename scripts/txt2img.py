@@ -114,7 +114,7 @@ def make_ui():
             ],
         [sg.HSeparator()],
         [sg.Image(size=(512,512), key='Image', enable_events=True, background_color=sg.theme_button_color()[1] )],
-        [sg.Text('Sample:', justification='l', expand_x=True, size=(60,4), key='SampleInfo')],
+        [sg.Text('Sample:', justification='l', expand_x=True, size=(60,4), key='SampleInfo', font='Consolas')],
         [
             sg.Button('Clear All', size=(8,1), key='-CLEARALL-', tooltip='Clears sample viewer history.  If samples are not saved to disk, this will permanently erase them.'), 
             sg.Button('Clear (Del)', size=(8,1), key='-CLEAR-', tooltip='Clears currently viewed sample.'),  
@@ -181,9 +181,9 @@ def ui_thread(window:sg.Window):
         if index < len(datalist) and index >= 0:
             _img, _options, _samplenum = datalist[index]
             window['SampleInfo'].update(
-                f"{_options['process']} Sampler: {_options['sampler']} seed {_options['seed']}:{_options['seed_offset']}, sample {_samplenum}\n\
-{_options['ddim_steps']} substeps, g_scale: {_options['scale']}\n\
-\"{_options['prompt']}\"")
+                f"{_options['process']}-{_options['sampler']:10} | seed: {_options['seed']:010}:{_options['seed_offset']+_samplenum:03}\n\
+substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
+> \"{_options['prompt']}\"")
             window['Image'].update(data=ImageTk.PhotoImage(_img))
             curr_sample_i = index
         else:
@@ -205,8 +205,8 @@ def ui_thread(window:sg.Window):
         if '_saved' in _options:
             return
         _options['_saved'] = True
-        prompthash = hl.sha256(bytes(_options['prompt'], 'utf-8')).hexdigest()
-        _path = os.path.join(_options['outdir'], "interactive", prompthash[:16])
+        # prompthash = hl.sha256(bytes(_options['prompt'], 'utf-8')).hexdigest()
+        _path = os.path.join(_options['outdir'], "interactive")
         os.makedirs(_path, exist_ok=True)
         _file = os.path.join(_path, f"{_options['seed']:08}-{_options['seed_offset']:02}-{_i}.png")
 
