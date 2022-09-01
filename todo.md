@@ -17,6 +17,7 @@ Done:
 
 ## Bugs
 
+- [ ] enable strength when img2img enabled
 
 Done:
 
@@ -24,15 +25,16 @@ Done:
 - [x] delete key too overzealous
 ## Minor Features
 
-- [ ] UI refresh
+- [ ] img load from any source (img2img)
 - [ ] improved grid w/ auto axis-labeling
 - [ ] status bar full event coverage
-- [ ] save project
 - [ ] copy image to clipboard
-- [ ] queue generations
+- [ ] save project
 - [ ] highlight grouped in thumbnails
-- [ ] checkboxes for reuptake of parameters
+- [ ] queue generations
 - [ ] update in-app
+- [ ] checkboxes for reuptake of parameters
+- [ ] UI refresh
 - [ ] readme, tip jar
 
 Done:
