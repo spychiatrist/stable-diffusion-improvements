@@ -27,6 +27,8 @@ Done:
 - [ ] cancel generation
 - [ ] highlight grouped in thumbnails
 - [ ] checkboxes for reuptake of parameters
+- [ ] update in-app
+- [ ] bigger prompt box
 - [ ] readme, tip jar
 
 Done:
