@@ -17,6 +17,8 @@ Done:
 
 ## Bugs
 
+- [ ] save overwrites
+- [ ] save state getting corrupted somehow
 - [ ] enable strength when img2img enabled
 
 Done:
