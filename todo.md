@@ -29,6 +29,8 @@ Done:
 - [ ] checkboxes for reuptake of parameters
 - [ ] update in-app
 - [ ] bigger prompt box
+- [ ] prompt clear button
+- [ ] defocus on sample select
 - [ ] readme, tip jar
 
 Done:
