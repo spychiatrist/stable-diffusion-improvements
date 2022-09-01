@@ -18,6 +18,7 @@ from itertools import product
 
 
 opt = None
+g_init_img = None
 
 window:sg.Window = None
 
@@ -179,7 +180,10 @@ def ui_thread(window:sg.Window):
         global curr_sample_i
         if index < len(datalist) and index >= 0:
             _img, _options, _samplenum = datalist[index]
-            window['SampleInfo'].update(f"Sample: seed {_options['seed']}:{_options['seed_offset']}, sample {_samplenum}.\n{_options['ddim_steps']} substeps, g_scale: {_options['scale']}\n\"{_options['prompt']}\"")
+            window['SampleInfo'].update(
+                f"{_options['process']} Sampler: {_options['sampler']} seed {_options['seed']}:{_options['seed_offset']}, sample {_samplenum}\n\
+{_options['ddim_steps']} substeps, g_scale: {_options['scale']}\n\
+\"{_options['prompt']}\"")
             window['Image'].update(data=ImageTk.PhotoImage(_img))
             curr_sample_i = index
         else:
@@ -247,12 +251,13 @@ def ui_thread(window:sg.Window):
 
     def GenerateYield():
         global curr_sample_i
+        global g_init_img
 
         if values['tti']: #text to image params:
             opt.process = 'tti'
         else:
             opt.process = 'iti'
-            opt.init_img = datalist[curr_sample_i][0]
+            g_init_img = datalist[curr_sample_i][0]
 
 
         opt.prompt =        values['prompt']
@@ -522,7 +527,7 @@ def backend_loop():
             height=opt.H,
             sampler_name=opt.sampler,
             strength=opt.strength,
-            init_img=opt.init_img if opt.process == 'iti' else None
+            init_img=g_init_img if opt.process == 'iti' else None
         )
 
 
