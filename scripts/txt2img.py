@@ -403,11 +403,12 @@ def ui_thread(window:sg.Window):
 
             if event == '-D-ARROW-':
                 #Search forward for next previous sample with matching settings
-                curr_data = datalist[curr_sample_i]
-                for i, data in enumerate(datalist[curr_sample_i+1:]):
-                    if opts_eq(curr_data, data):
-                        SetSampleAndInfo(curr_sample_i + 1 + i)
-                        break
+                if curr_sample_i > 0:
+                    curr_data = datalist[curr_sample_i]
+                    for i, data in enumerate(datalist[curr_sample_i+1:]):
+                        if opts_eq(curr_data, data):
+                            SetSampleAndInfo(curr_sample_i + 1 + i)
+                            break
 
             if event == '-U-ARROW-':
                 if curr_sample_i > 0:
