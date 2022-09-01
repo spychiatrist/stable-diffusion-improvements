@@ -18,6 +18,9 @@ Done:
 ## Bugs
 
 
+Done:
+
+- [x] delete key too overzealous
 ## Minor Features
 
 - [ ] UI refresh
@@ -30,11 +33,11 @@ Done:
 - [ ] highlight grouped in thumbnails
 - [ ] checkboxes for reuptake of parameters
 - [ ] update in-app
-- [ ] prompt clear button
 - [ ] readme, tip jar
 
 Done:
 
+- [x] prompt clear button
 - [x] defocus on sample select
 - [x] bigger prompt box
 - [x] Prompt sampler display
