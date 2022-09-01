@@ -43,7 +43,21 @@ def make_ui():
     programName = 'Stable Diffusion Interactive'
 
     sampler_choices = ['k_lms', 'k_euler_a', 'ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_euler', 'k_heun', 'plms']
-    def TextLabel(text): return sg.Text(text+':', justification='r', size=(15,1))
+    def TextLabel(text, base_key, vis=True): return sg.Text(text+':', justification='r', size=(18,1), visible=vis, k='label_' + base_key)
+
+    def InputRow(text, base_key, default_text, tooltip, groupable=False, group_default=False, vis=True, input_size_v=1):
+        ret = [
+            TextLabel(text, base_key, vis=vis),
+        ]
+        if input_size_v==1:
+            ret.append(sg.Input(key=base_key, default_text=default_text, tooltip=tooltip, visible=vis, size=(80,1)))
+        else:
+            ret.append(sg.Multiline(key=base_key, default_text=default_text, tooltip=tooltip, no_scrollbar=True, visible=vis, size=(80,input_size_v)))
+        if groupable:
+            ret.append(GroupCheckbox(base_key, group_default))
+        return ret
+
+
     def ThumbnailImage(key): 
         _l = [[sg.Image(size=(64,64), subsample=4, key=key, p=2, background_color=sg.theme_button_color()[1], enable_events=True)]]
         return sg.Frame(" ", _l, p=1, background_color=sg.theme_button_color()[1], key=key+'_f' )
@@ -57,17 +71,18 @@ def make_ui():
 
     layout_settings = [
         # [sg.Text('Parameters', font='Any 13')],
-        [TextLabel('Sampler'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' ), sg.Radio('txt->img', 'SamplerProcess', k='tti', default=True), sg.Radio('img->img', 'SamplerProcess', k='iti')],
-        [TextLabel('Prompt'), sg.Input(key='prompt', default_text=opt.prompt, tooltip='Description of the image you would like to see.'), GroupCheckbox('prompt', True)],
-        [TextLabel('Seed'), sg.Input(key='seed', default_text=opt.seed, tooltip='Seed for first image generation.'), GroupCheckbox('seed', True)],
-        [TextLabel('Seed Sampler Offset'), sg.Input(key='seed_offset', default_text=opt.seed_offset, tooltip='Numeric offset into batch.  Effectively, number of samples to skip. \
- Useful if you want to re-run a single image generation nested within a sample batch.'), GroupCheckbox('seed_offset', True)],
-        [TextLabel('Sampler Substeps'), sg.Input(key='ddim_steps', default_text=opt.ddim_steps, tooltip='Number of substeps per batch.'), GroupCheckbox('ddim_steps', False)],
-        [TextLabel('Guidance Scale'), sg.Input(key='scale', default_text=opt.scale, tooltip='Unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))'), GroupCheckbox('scale', False)],
-        [TextLabel('Strength'), sg.Input(key='strength', default_text=opt.strength, tooltip='Image-to-Image strength (0.0, 1.0)')],
-        [TextLabel('Iterations'), sg.Input(key='n_iter', default_text=opt.n_iter, tooltip='Number of batches per generation.')],
-        [TextLabel('Samples'), sg.Input(key='n_samples', default_text=opt.n_samples, tooltip='Number of samples per batch.')],
-        [TextLabel('Sampler Eta'), sg.Input(key='ddim_eta', default_text=opt.ddim_eta, disabled=True)],
+        [TextLabel('Sampler', 'SamplerCombo'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' ), sg.Radio('txt->img', 'SamplerProcess', k='tti', default=True), sg.Radio('img->img', 'SamplerProcess', k='iti')],
+
+        InputRow('Prompt'               , 'prompt'      , opt.prompt      , 'Description of the image you would like to see.' , input_size_v=3                                                                                          , groupable=True, group_default=True),
+        InputRow('Seed'                 , 'seed'        , opt.seed        , 'Seed for first image generation.'                                                                                                                          , groupable=True, group_default=True),
+        InputRow('Seed Sampler Offset'  , 'seed_offset' , opt.seed_offset , 'Numeric offset into batch.  Effectively, number of samples to skip.  Useful if you want to re-run a single image generation nested within a sample batch.' , groupable=True, group_default=True),
+        InputRow('Sampler Substeps'     , 'ddim_steps'  , opt.ddim_steps  , 'Number of substeps per batch.'                                                                                                                             , groupable=True                    ),
+        InputRow('Guidance Scale'       , 'scale'       , opt.scale       , 'Unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))'                                                                , groupable=True                    ),
+        InputRow('Iterations'           , 'n_iter'      , opt.n_iter      , 'Number of batches per generation.'                                                                                                                                                             ),
+        InputRow('Batch Size (Samples)' , 'n_samples'   , opt.n_samples   , 'Number of samples per batch.'                                                                                                                                                                  ),
+        InputRow('Strength'             , 'strength'    , opt.strength    , 'Image-to-Image strength (0.0, 1.0)'                                                                                                                        , vis=False                         ),
+        InputRow('Sampler Eta'          , 'ddim_eta'    , opt.ddim_eta    , 'Deprecated: ddim eta'                                                                                                                                      , vis=False                         ),
+
         [
             sg.Checkbox('Skip Sample Save',key='skip_save', default=opt.skip_save, tooltip='If checked, program will not save each sample automatically.'),
             sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid, tooltip='If checked, program will not save grid collages of each batch.')
@@ -117,7 +132,7 @@ def make_ui():
         [],
     ]
     layout = [
-        [sg.Frame('Generation Parameters', layout=layout_settings, vertical_alignment='top', p=0), 
+        [sg.Frame('Generation Parameters', layout=layout_settings, size=(800, 10), expand_y=True, vertical_alignment='top', p=0), 
             sg.VSeparator(), 
             sg.Frame('Sample Browser', layout=layout_imageviewer, p=0),
             sg.VSeparator(), 
