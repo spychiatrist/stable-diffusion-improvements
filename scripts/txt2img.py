@@ -375,7 +375,9 @@ def ui_thread(window:sg.Window):
             if curr_sample_i < len(datalist):
                 del datalist[curr_sample_i]
                 UpdateThumbnails()
-                window.write_event_value('-R-ARROW-', None)
+                i_attempt = min(len(datalist) - 1, curr_sample_i)
+                SetSampleAndInfo(i_attempt)
+                
 
 
         elif event == '-RESET-PARAMS-':
