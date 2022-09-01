@@ -1,31 +1,20 @@
 import argparse, os, sys, glob
 import json
-from ctypes import alignment
-from ast import arg
-import torch
+#from ctypes import alignment
+#from ast import arg
 import hashlib as hl
-import numpy as np
-from omegaconf import OmegaConf
+#import numpy as np
 from PIL import Image,ImageTk
 from PIL.PngImagePlugin import PngInfo
 import PySimpleGUI as sg
-import tkinter as tk
+#import tkinter as tk
 import threading
-from tqdm import tqdm, trange
-from itertools import islice
-from einops import rearrange
-from torchvision.utils import make_grid
-import time
-from pytorch_lightning import seed_everything
-from torch import autocast
-from contextlib import contextmanager, nullcontext
+#from torchvision.utils import make_grid
+#import time
+#from torch import autocast
+#from contextlib import contextmanager, nullcontext
 from itertools import product
 
-from ldm.util import instantiate_from_config
-from ldm.models.diffusion.ddim import DDIMSampler
-from ldm.models.diffusion.plms import PLMSSampler
-from ldm.models.diffusion.ksampler import KSampler
-from ldm.simplet2i import T2I
 
 
 opt = None
@@ -39,11 +28,11 @@ def main():
     
 
     window = make_ui()
-    seed_everything(opt.seed)
 
     
     sem_generate.acquire()
-    threading.Thread(target=backend_loop).start()
+    if not opt.debug_ui:
+        threading.Thread(target=backend_loop).start()
     ui_thread(window)
 
 
@@ -124,9 +113,15 @@ def make_ui():
         ],
         [sg.Push(), sg.FileBrowse(k='FileOpen', target='FileOpen', change_submits=True)],
     ]
-
+    layout_canvaseditor = [
+        [],
+    ]
     layout = [
-        [sg.Frame('Generation Parameters', layout=layout_settings, vertical_alignment='top', p=0), sg.VSeparator(), sg.Frame('Sample Browser', layout=layout_imageviewer, p=0)],
+        [sg.Frame('Generation Parameters', layout=layout_settings, vertical_alignment='top', p=0), 
+            sg.VSeparator(), 
+            sg.Frame('Sample Browser', layout=layout_imageviewer, p=0),
+            sg.VSeparator(), 
+            sg.Frame('Canvas Editor', layout=layout_canvaseditor, p=0)],
         [sg.StatusBar(f'Welcome to {programName}', expand_x=True, key='StatusBar')]
     ]
 
@@ -333,11 +328,12 @@ def ui_thread(window:sg.Window):
 
         elif event in imgKeys: # clicked a thumbnail
             _i = imgKeys.index(event)
+            window.force_focus()
             SetSampleAndInfo(_i)
 
         elif event == '-ITER-':
             imgs, _i = values[event]
-            if values['_visualize_sub']: 
+            if values['_visualize_sub'] and imgs != None: 
                 #for img in imgs:
                 window['Image'].update(data=ImageTk.PhotoImage(imgs[0]))
 
@@ -359,7 +355,7 @@ def ui_thread(window:sg.Window):
             if curr_sample_i < len(datalist):
                 del datalist[curr_sample_i]
                 UpdateThumbnails()
-                window.write_event_value('-L-ARROW-', None)
+                window.write_event_value('-R-ARROW-', None)
 
 
         elif event == '-RESET-PARAMS-':
@@ -436,6 +432,9 @@ def ui_thread(window:sg.Window):
 
 def backend_loop():
     global window
+
+    from ldm.simplet2i import T2I
+    from pytorch_lightning import seed_everything
 
     t2i = T2I(
         width=opt.W,
@@ -521,6 +520,11 @@ def parse_args():
         nargs="?",
         help="dir to write results to",
         default="outputs/txt2img-samples"
+    )
+    parser.add_argument(
+        "--debug_ui",
+        action='store_true',
+        help="only load UI, no backend",
     )
     parser.add_argument(
         "--skip_grid",
