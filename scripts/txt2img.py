@@ -22,8 +22,10 @@ g_init_img = None
 
 window:sg.Window = None
 
+g_backend_thread = None
+
 def main():
-    global opt
+    global opt, g_backend_thread
     global window
     opt = parse_args()
     
@@ -33,7 +35,7 @@ def main():
     
     sem_generate.acquire()
     if not opt.debug_ui:
-        threading.Thread(target=backend_loop).start()
+        g_backend_thread = threading.Thread(target=backend_loop).start()
     ui_thread(window)
 
 
@@ -94,7 +96,7 @@ def make_ui():
             sg.Checkbox('Skip Sample Save',key='skip_save', default=opt.skip_save, tooltip='If checked, program will not save each sample automatically.'),
             sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid, tooltip='If checked, program will not save grid collages of each batch.')
         ],
-        [sg.Button('Generate', size=(20,2), disabled=True), sg.ProgressBar(k='GenerateProgress', max_value=100, s=(30, 20), orientation='h')],
+        [sg.Button('Generate', size=(20,2), disabled=True), sg.Button('Cancel', size=(12,2), disabled=False), sg.ProgressBar(k='GenerateProgress', max_value=100, s=(30, 20), orientation='h')],
         [sg.HSeparator()],
         [sg.Text('Viewer Options', font='Any 13')],
         [
@@ -320,9 +322,13 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
         event, values = window.read()
 
         if event == 'Generate': # generate button event
+            opt.cancel = False
             generator_params_yield = GenerateYield()
             SetThreadActionsDisabled(True)
             next(generator_params_yield)
+
+        elif event == 'Cancel':
+            opt.cancel = True
 
 
         elif event == '-READY-':
@@ -435,7 +441,7 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
 
             elif event == '-D-ARROW-':
                 #Search forward for next previous sample with matching settings
-                if curr_sample_i > 0:
+                if len(datalist) > 0:
                     curr_data = datalist[curr_sample_i]
                     for i, data in enumerate(datalist[curr_sample_i+1:]):
                         if opts_eq(curr_data, data):
@@ -516,6 +522,8 @@ def backend_loop():
             if opt._visualize_sub:
                 imgs = t2i._samples_to_images(x0)
             window.write_event_value('-ITER-', (imgs, i))
+            if opt.cancel:
+                raise KeyboardInterrupt
 
         def iter_callback(img:Image, seed, i):
             opt.seed=seed

@@ -20,6 +20,7 @@ Done:
 
 Done:
 
+- [x] fix regression in down arrow
 - [x] delete key too overzealous
 ## Minor Features
 
@@ -29,7 +30,6 @@ Done:
 - [ ] save project
 - [ ] copy image to clipboard
 - [ ] queue generations
-- [ ] cancel generation
 - [ ] highlight grouped in thumbnails
 - [ ] checkboxes for reuptake of parameters
 - [ ] update in-app
@@ -37,6 +37,7 @@ Done:
 
 Done:
 
+- [x] cancel generation
 - [x] prompt clear button
 - [x] defocus on sample select
 - [x] bigger prompt box
