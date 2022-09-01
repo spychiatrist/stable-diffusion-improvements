@@ -15,10 +15,13 @@ Done:
 - [x] save file params
 - [x] transfer params back from image
 
+## Bugs
+
 
 ## Minor Features
 
 - [ ] UI refresh
+- [ ] Prompt sampler display
 - [ ] improved grid w/ auto axis-labeling
 - [ ] status bar full event coverage
 - [ ] save project
