@@ -27,6 +27,7 @@ Done:
 - [x] delete key too overzealous
 ## Minor Features
 
+- [ ] sampler group for scrolling (up/down)
 - [ ] img load from any source (img2img)
 - [ ] improved grid w/ auto axis-labeling
 - [ ] status bar full event coverage

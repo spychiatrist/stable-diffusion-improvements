@@ -23,12 +23,31 @@ g_init_img = None
 window:sg.Window = None
 
 g_backend_thread = None
+g_settings = {'save_num':0, }
+
+def SaveSettings():
+    global g_settings, opt
+    os.makedirs(opt.settings_path, exist_ok=True)
+    with open( os.path.join(opt.settings_path, "settings.json"), "w") as f:
+        f.write(json.dumps(g_settings))
+
+def LoadSettings():
+    global g_settings, opt
+    sfp = os.path.join(opt.settings_path, "settings.json")
+    if os.path.exists(sfp):
+        with open(sfp, "r") as f:
+            g_settings = json.load(f)
+    else:
+        SaveSettings()
 
 def main():
-    global opt, g_backend_thread
+    global opt, g_settings, g_backend_thread
     global window
     opt = parse_args()
-    
+
+    LoadSettings()
+        
+        
 
     window = make_ui()
 
@@ -80,7 +99,7 @@ def make_ui():
 
     layout_settings = [
         # [sg.Text('Parameters', font='Any 13')],
-        [TextLabel('Sampler', 'SamplerCombo'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' ), sg.Radio('txt->img', 'SamplerProcess', k='tti', default=True), sg.Radio('img->img', 'SamplerProcess', k='iti')],
+        [TextLabel('Sampler', 'SamplerCombo'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' ), sg.Radio('txt->img', 'SamplerProcess', k='tti', enable_events=True, default=True), sg.Radio('img->img', 'SamplerProcess', enable_events=True, k='iti')],
 
         InputRow('Prompt'               , 'prompt'      , opt.prompt      , 'Description of the image you would like to see.' , input_size_v=3                                                                                          , groupable=True, group_default=True),
         InputRow('Seed'                 , 'seed'        , opt.seed        , 'Seed for first image generation.'                                                                                                                          , groupable=True, group_default=True),
@@ -89,7 +108,7 @@ def make_ui():
         InputRow('Guidance Scale'       , 'scale'       , opt.scale       , 'Unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))'                                                                , groupable=True                    ),
         InputRow('Iterations'           , 'n_iter'      , opt.n_iter      , 'Number of batches per generation.'                                                                                                                                                             ),
         InputRow('Batch Size (Samples)' , 'n_samples'   , opt.n_samples   , 'Number of samples per batch.'                                                                                                                                                                  ),
-        InputRow('Strength'             , 'strength'    , opt.strength    , 'Image-to-Image strength (0.0, 1.0)'                                                                                                                        , vis=False                         ),
+        InputRow('Strength'             , 'strength'    , opt.strength    , 'Image-to-Image strength (0.0, 1.0)'                                                                                                                                                            ),
         InputRow('Sampler Eta'          , 'ddim_eta'    , opt.ddim_eta    , 'Deprecated: ddim eta'                                                                                                                                      , vis=False                         ),
 
         [
@@ -135,7 +154,7 @@ def make_ui():
             sg.Button('Set Params', size=(8,1), key='-RESET-PARAMS-', tooltip='Set the generation parameters (on the left) to whatever generated the image shown.'), 
             sg.Checkbox('Single-shot?', key='-RESET-PARAMS-SingleShot-', tooltip='Check this box to ignore prior sample num/iteration num in favor of 1.', default=True), sg.Push()
         ],
-        [sg.Push(), sg.FileBrowse(k='FileOpen', target='FileOpen', change_submits=True)],
+        [sg.Push(), sg.FilesBrowse(button_text='Open', k='FileOpen', target='FileOpen', change_submits=True)],
     ]
     layout_canvaseditor = [
         [],
@@ -206,17 +225,23 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
             else:
                 window[imgKey+'_f'].update(value=" ")
 
+    
+
 
     def SaveImage(index):
+        global g_settings
         _img, _options, _i = datalist[index]
 
-        if '_saved' in _options:
+        if '_saved' in _options and _options['_saved']:
             return
         _options['_saved'] = True
         # prompthash = hl.sha256(bytes(_options['prompt'], 'utf-8')).hexdigest()
-        _path = os.path.join(_options['outdir'], "interactive")
+        _path = os.path.join(opt.outdir, "interactive")
         os.makedirs(_path, exist_ok=True)
-        _file = os.path.join(_path, f"{_options['seed']:08}-{_options['seed_offset']:02}-{_i}.png")
+        _file = os.path.join(_path, f"{g_settings['save_num']:010}.png")
+
+        g_settings['save_num'] += 1
+        SaveSettings()
 
         metadata = PngInfo()
 
@@ -289,6 +314,8 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
             sem_generate.release()      
             yield
 
+    def SetItiEnabled(val:bool):
+        window['strength'].update(disabled= not val)
 
     def ParseNumericParam(input:str, castfn): 
         s = input.split(':')
@@ -348,6 +375,10 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
             SetThreadActionsDisabled(True)
             sem_generate.release()
 
+        elif event == 'tti':
+            SetItiEnabled(False)
+        elif event == 'iti':
+            SetItiEnabled(True)
 
 
         elif event == '-IMAGE-': # new image from backend event
@@ -381,7 +412,10 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
                 SaveImage(curr_sample_i)
         
         elif event == 'FileOpen':
-            LoadImage(values['FileOpen'])
+            s:str = values['FileOpen']
+            l_files = s.split(';')
+            for f in l_files:
+                LoadImage(f)
 
         elif event == '-CLEARALL-':
             datalist.clear()
@@ -566,6 +600,13 @@ def parse_args():
         nargs="?",
         help="dir to write results to",
         default="outputs/txt2img-samples"
+    )
+    parser.add_argument(
+        "--settings_path",
+        type=str,
+        nargs="?",
+        help="dir to write results to",
+        default="settings"
     )
     parser.add_argument(
         "--debug_ui",
