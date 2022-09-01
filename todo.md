@@ -21,7 +21,6 @@ Done:
 ## Minor Features
 
 - [ ] UI refresh
-- [ ] Prompt sampler display
 - [ ] improved grid w/ auto axis-labeling
 - [ ] status bar full event coverage
 - [ ] save project
@@ -31,13 +30,14 @@ Done:
 - [ ] highlight grouped in thumbnails
 - [ ] checkboxes for reuptake of parameters
 - [ ] update in-app
-- [ ] bigger prompt box
 - [ ] prompt clear button
-- [ ] defocus on sample select
 - [ ] readme, tip jar
 
 Done:
 
+- [x] defocus on sample select
+- [x] bigger prompt box
+- [x] Prompt sampler display
 - [x] auto-increment seed/random next seed
 - [x] fully decoupled relaunch w/ modified models
 - [x] instance-history
