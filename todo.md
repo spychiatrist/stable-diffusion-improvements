@@ -23,6 +23,9 @@ Done:
 - [ ] status bar full event coverage
 - [ ] save project
 - [ ] copy image to clipboard
+- [ ] queue generations
+- [ ] cancel generation
+- [ ] highlight grouped in thumbnails
 - [ ] readme, tip jar
 
 Done:
