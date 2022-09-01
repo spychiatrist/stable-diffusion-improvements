@@ -1,20 +1,34 @@
-    
-- [ ] k_lms & friends (`https://github.com/lstein/k-diffusion.git@master#egg=k-diffusion`)
-- [ ] differential param modulation by functions (UI or text)
-  - [ ] improved grid
-  - [ ] auto axis-labeling
-- [ ] auto-increment seed/random next seed
-- [ ] img2img direct tab
-- [ ] fully decoupled relaunch w/ modified models
-- [ ] status bar full event coverage
-- [ ] save project
+# Todos
+
+## Major Features
+
+- [ ] inpainting
+- [ ] outpainting
+- [ ] GIF export
 - [ ] memory-optimized models
-- [ ] k-lms
-- [ ] readme, tip jar
-- [ ] copy image to clipboard
-- [x] instance-history
+
+Done:
+
+- [x] img2img direct tab
+- [x] k_lms & friends (`https://github.com/lstein/k-diffusion.git@master#egg=k-diffusion`)
+- [x] differential param modulation by functions (UI or text)
 - [x] save file params
-- [x] status bar
-- [x] improved history view
 - [x] transfer params back from image
 
+
+## Minor Features
+
+- [ ] UI refresh
+- [ ] improved grid w/ auto axis-labeling
+- [ ] status bar full event coverage
+- [ ] save project
+- [ ] copy image to clipboard
+- [ ] readme, tip jar
+
+Done:
+
+- [x] auto-increment seed/random next seed
+- [x] fully decoupled relaunch w/ modified models
+- [x] instance-history
+- [x] improved history view
+- [x] status bar
