@@ -17,17 +17,17 @@ Done:
 
 ## Bugs
 
-- [ ] save overwrites
-- [ ] save state getting corrupted somehow
-- [ ] enable strength when img2img enabled
+
 
 Done:
 
 - [x] fix regression in down arrow
 - [x] delete key too overzealous
+- [x] save overwrites
+- [x] save state getting corrupted somehow
+- [x] enable strength when img2img enabled
 ## Minor Features
 
-- [ ] sampler group for scrolling (up/down)
 - [ ] img load from any source (img2img)
 - [ ] improved grid w/ auto axis-labeling
 - [ ] status bar full event coverage
@@ -42,6 +42,7 @@ Done:
 
 Done:
 
+- [x] sampler group for scrolling (up/down)
 - [x] cancel generation
 - [x] prompt clear button
 - [x] defocus on sample select

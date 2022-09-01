@@ -99,7 +99,8 @@ def make_ui():
 
     layout_settings = [
         # [sg.Text('Parameters', font='Any 13')],
-        [TextLabel('Sampler', 'SamplerCombo'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' ), sg.Radio('txt->img', 'SamplerProcess', k='tti', enable_events=True, default=True), sg.Radio('img->img', 'SamplerProcess', enable_events=True, k='iti')],
+        [TextLabel('Sampler', 'SamplerCombo'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' ), 
+            sg.Radio('txt->img', 'SamplerProcess', k='tti', enable_events=True, default=True), sg.Radio('img->img', 'SamplerProcess', enable_events=True, k='iti'), sg.Push(), GroupCheckbox('sampler', default=False)],
 
         InputRow('Prompt'               , 'prompt'      , opt.prompt      , 'Description of the image you would like to see.' , input_size_v=3                                                                                          , groupable=True, group_default=True),
         InputRow('Seed'                 , 'seed'        , opt.seed        , 'Seed for first image generation.'                                                                                                                          , groupable=True, group_default=True),
@@ -463,6 +464,7 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
                 if values['g_seed_offset'] and not (_cmp_key('seed_offset') and _sn1 == _sn2): return False
                 if values['g_ddim_steps' ] and not  _cmp_key('ddim_steps'                   ): return False
                 if values['g_scale'      ] and not  _cmp_key('scale'                        ): return False
+                if values['g_sampler'    ] and not  _cmp_key('sampler'                      ): return False
                 if values['g_prompt'     ] and not  _cmp_key('prompt'                       ): return False
                 return True
                     
