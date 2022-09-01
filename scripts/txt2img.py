@@ -97,7 +97,7 @@ def make_ui():
                 expand_x=True, expand_y=True, p=1, background_color=sg.theme_button_color()[1], key='ThumbOverflowText_f', s=(68, 68) , vertical_alignment='center', element_justification='center'),
             ],
         [sg.HSeparator()],
-        [sg.Image(size=(512,512), key='Image', background_color=sg.theme_button_color()[1] )],
+        [sg.Image(size=(512,512), key='Image', enable_events=True, background_color=sg.theme_button_color()[1] )],
         [sg.Text('Sample:', justification='l', expand_x=True, size=(60,4), key='SampleInfo')],
         [
             sg.Button('Clear All', size=(8,1), key='-CLEARALL-', tooltip='Clears sample viewer history.  If samples are not saved to disk, this will permanently erase them.'), 
@@ -330,6 +330,11 @@ def ui_thread(window:sg.Window):
             _i = imgKeys.index(event)
             window.force_focus()
             SetSampleAndInfo(_i)
+
+        elif event == 'Image':
+            window.force_focus()
+
+
 
         elif event == '-ITER-':
             imgs, _i = values[event]
