@@ -26,6 +26,7 @@ Done:
 - [ ] queue generations
 - [ ] cancel generation
 - [ ] highlight grouped in thumbnails
+- [ ] checkboxes for reuptake of parameters
 - [ ] readme, tip jar
 
 Done:
