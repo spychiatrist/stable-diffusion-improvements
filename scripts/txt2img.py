@@ -46,14 +46,20 @@ def make_ui():
     sampler_choices = ['k_lms', 'k_euler_a', 'ddim', 'k_dpm_2_a', 'k_dpm_2', 'k_euler', 'k_heun', 'plms']
     def TextLabel(text, base_key, vis=True): return sg.Text(text+':', justification='r', size=(18,1), visible=vis, k='label_' + base_key)
 
+
+    w_input=80
     def InputRow(text, base_key, default_text, tooltip, groupable=False, group_default=False, vis=True, input_size_v=1):
         ret = [
             TextLabel(text, base_key, vis=vis),
         ]
         if input_size_v==1:
-            ret.append(sg.Input(key=base_key, default_text=default_text, tooltip=tooltip, visible=vis, size=(80,1)))
+            ret.append(sg.Input(key=base_key, default_text=default_text, tooltip=tooltip, visible=vis, size=(w_input,1)))
         else:
-            ret.append(sg.Multiline(key=base_key, default_text=default_text, tooltip=tooltip, no_scrollbar=True, visible=vis, size=(80,input_size_v)))
+            dp = sg.DEFAULT_ELEMENT_PADDING
+            ret.append(sg.Multiline(key=base_key, default_text=default_text, tooltip=tooltip, no_scrollbar=True, visible=vis, size=(w_input - 4,input_size_v), pad=((dp[0], 0),(0, 0))))
+            ret.append(sg.Button('X', size=(2,1), k='x_'+base_key, pad=((0, 0),(dp[1], dp[1]))))
+
+        ret.append(sg.Push())
         if groupable:
             ret.append(GroupCheckbox(base_key, group_default))
         return ret
@@ -376,12 +382,10 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
             UpdateThumbnails()
             SetSampleAndInfo(0)
 
-        elif event == '-CLEAR-':
-            if curr_sample_i < len(datalist):
-                del datalist[curr_sample_i]
-                UpdateThumbnails()
-                i_attempt = min(len(datalist) - 1, curr_sample_i)
-                SetSampleAndInfo(i_attempt)
+
+
+        elif event == 'x_prompt': 
+            window['prompt'].update('')
                 
 
 
@@ -422,8 +426,14 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
                 if values['g_prompt'     ] and not  _cmp_key('prompt'                       ): return False
                 return True
                     
+            if event == '-CLEAR-':
+                if curr_sample_i < len(datalist):
+                    del datalist[curr_sample_i]
+                    UpdateThumbnails()
+                    i_attempt = min(len(datalist) - 1, curr_sample_i)
+                    SetSampleAndInfo(i_attempt)
 
-            if event == '-D-ARROW-':
+            elif event == '-D-ARROW-':
                 #Search forward for next previous sample with matching settings
                 if curr_sample_i > 0:
                     curr_data = datalist[curr_sample_i]
@@ -432,7 +442,7 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
                             SetSampleAndInfo(curr_sample_i + 1 + i)
                             break
 
-            if event == '-U-ARROW-':
+            elif event == '-U-ARROW-':
                 if curr_sample_i > 0:
                     curr_data = datalist[curr_sample_i]
                     for i, data in enumerate(datalist[curr_sample_i-1::-1]):
@@ -440,7 +450,7 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
                             SetSampleAndInfo(curr_sample_i - 1 - i)
                             break
 
-            if event == '-R-ARROW-':
+            elif event == '-R-ARROW-':
                 i_attempt = max(0, min(len(datalist) - 1, curr_sample_i + 1))
                 SetSampleAndInfo(i_attempt)
 
