@@ -68,13 +68,14 @@ def make_ui():
 
     layout_settings = [
         # [sg.Text('Parameters', font='Any 13')],
-        [TextLabel('Sampler'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' )],
+        [TextLabel('Sampler'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' ), sg.Radio('txt->img', 'SamplerProcess', k='tti', default=True), sg.Radio('img->img', 'SamplerProcess', k='iti')],
         [TextLabel('Prompt'), sg.Input(key='prompt', default_text=opt.prompt, tooltip='Description of the image you would like to see.'), GroupCheckbox('prompt', True)],
         [TextLabel('Seed'), sg.Input(key='seed', default_text=opt.seed, tooltip='Seed for first image generation.'), GroupCheckbox('seed', True)],
         [TextLabel('Seed Sampler Offset'), sg.Input(key='seed_offset', default_text=opt.seed_offset, tooltip='Numeric offset into batch.  Effectively, number of samples to skip. \
  Useful if you want to re-run a single image generation nested within a sample batch.'), GroupCheckbox('seed_offset', True)],
         [TextLabel('Sampler Substeps'), sg.Input(key='ddim_steps', default_text=opt.ddim_steps, tooltip='Number of substeps per batch.'), GroupCheckbox('ddim_steps', False)],
         [TextLabel('Guidance Scale'), sg.Input(key='scale', default_text=opt.scale, tooltip='Unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))'), GroupCheckbox('scale', False)],
+        [TextLabel('Strength'), sg.Input(key='strength', default_text=opt.strength, tooltip='Image-to-Image strength (0.0, 1.0)')],
         [TextLabel('Iterations'), sg.Input(key='n_iter', default_text=opt.n_iter, tooltip='Number of batches per generation.')],
         [TextLabel('Samples'), sg.Input(key='n_samples', default_text=opt.n_samples, tooltip='Number of samples per batch.')],
         [TextLabel('Sampler Eta'), sg.Input(key='ddim_eta', default_text=opt.ddim_eta, disabled=True)],
@@ -235,6 +236,15 @@ def ui_thread(window:sg.Window):
         window.force_focus()
 
     def GenerateYield():
+        global curr_sample_i
+
+        if values['tti']: #text to image params:
+            opt.process = 'tti'
+        else:
+            opt.process = 'iti'
+            opt.init_img = datalist[curr_sample_i][0]
+
+
         opt.prompt =        values['prompt']
         opt.skip_grid =       values['skip_grid']
         opt.skip_save =       values['skip_save']
@@ -244,14 +254,15 @@ def ui_thread(window:sg.Window):
         opt.seed_offset =   int(values['seed_offset'])
 
         l_scale =           ParseNumericParam( (values['scale']), float)
+        l_strength =        ParseNumericParam( (values['strength']), float)
         l_ddim_eta =        ParseNumericParam( (values['ddim_eta']), float)
         l_ddim_steps =      ParseNumericParam( (values['ddim_steps']), int)
         l_seed =            ParseNumericParam( (values['seed']), int)
         
-        perm_iterator = product(l_scale, l_ddim_eta, l_ddim_steps, l_seed)
+        perm_iterator = product(l_scale, l_strength, l_ddim_eta, l_ddim_steps, l_seed)
 
         for opt_it in perm_iterator:
-            opt.scale, opt.ddim_eta, opt.ddim_steps, opt.seed = opt_it
+            opt.scale, opt.strength, opt.ddim_eta, opt.ddim_steps, opt.seed = opt_it
             sem_generate.release()      
             yield
 
@@ -474,7 +485,7 @@ def backend_loop():
             _metadata = (img, opt.__dict__.copy(), i)
             window.write_event_value("-IMAGE-", _metadata)
             
-
+            
         seed_everything(opt.seed)
         t2i.prompt2image(prompt=opt.prompt,
             iterations=opt.n_iter,
@@ -487,7 +498,9 @@ def backend_loop():
             step_callback=substep_callback,
             width=opt.W,
             height=opt.H,
-            sampler_name=opt.sampler
+            sampler_name=opt.sampler,
+            strength=opt.strength,
+            init_img=opt.init_img if opt.process == 'iti' else None
         )
 
 
@@ -551,6 +564,12 @@ def parse_args():
         type=float,
         default=0.0,
         help="ddim eta (eta=0.0 corresponds to deterministic sampling",
+    )
+    parser.add_argument(
+        "--strength",
+        type=float,
+        default=0.7,
+        help="img2img strength",
     )
     parser.add_argument(
         "--n_iter",

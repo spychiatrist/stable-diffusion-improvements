@@ -290,7 +290,7 @@ class T2I:
 
         try:
             if init_img:
-                assert os.path.exists(init_img), f'{init_img}: File not found'
+                #assert os.path.exists(init_img), f'{init_img}: File not found'
                 images_iterator = self._img2img(
                     prompt,
                     precision_scope=scope,
@@ -615,13 +615,21 @@ class T2I:
             model.half()
         return model
 
-    def _load_img(self, path):
-        print(f'image path = {path}, cwd = {os.getcwd()}')
-        with Image.open(path) as img:
-            image = img.convert('RGB')
+    def _load_img(self, init_img):
+
+        image = None
+        if (isinstance(init_img, str)):
+
+            print(f'image path = {init_img}, cwd = {os.getcwd()}')
+            with Image.open(init_img) as img:
+                image = img.convert('RGB')
+
+        else:
+            image = init_img
+
 
         w, h = image.size
-        print(f'loaded input image of size ({w}, {h}) from {path}')
+        # print(f'loaded input image of size ({w}, {h}) from {path}')
         w, h = map(
             lambda x: x - x % 32, (w, h)
         )  # resize to integer multiple of 32
