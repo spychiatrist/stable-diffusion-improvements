@@ -7,7 +7,7 @@ import hashlib as hl
 from PIL import Image,ImageTk
 from PIL.PngImagePlugin import PngInfo
 import PySimpleGUI as sg
-#import tkinter as tk
+import tkinter as tk
 import threading
 #from torchvision.utils import make_grid
 #import time
@@ -17,8 +17,22 @@ from itertools import product
 
 
 
+class BackendInput:
+
+    def __init__(
+        self,
+        img = None, 
+        opt = None, 
+        samplenum = 0
+    ):
+        self.img = img
+        self.opt = opt
+        self.samplenum = samplenum      
+        self._visualize_sub = False
+        self.cancel = False  
+
 opt = None
-g_init_img:Image = None
+g_backend_input = BackendInput()
 
 window:sg.Window = None
 
@@ -69,12 +83,12 @@ def make_ui():
 
 
     w_input=80
-    def InputRow(text, base_key, default_text, tooltip, groupable=False, group_default=False, vis=True, input_size_v=1):
+    def InputRow(text, base_key, default_text, tooltip, groupable=False, group_default=False, disabled=False, vis=True, input_size_v=1):
         ret = [
             TextLabel(text, base_key, vis=vis),
         ]
         if input_size_v==1:
-            ret.append(sg.Input(key=base_key, default_text=default_text, tooltip=tooltip, visible=vis, size=(w_input,1)))
+            ret.append(sg.Input(key=base_key, default_text=default_text, tooltip=tooltip, visible=vis, disabled=disabled, disabled_readonly_background_color='#888888', size=(w_input,1)))
         else:
             dp = sg.DEFAULT_ELEMENT_PADDING
             ret.append(sg.Multiline(key=base_key, default_text=default_text, tooltip=tooltip, no_scrollbar=True, visible=vis, size=(w_input - 4,input_size_v), pad=((dp[0], 0),(0, 0))))
@@ -100,16 +114,16 @@ def make_ui():
     layout_settings = [
         # [sg.Text('Parameters', font='Any 13')],
         [TextLabel('Sampler', 'SamplerCombo'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' ), 
-            sg.Radio('txt->img', 'SamplerProcess', k='tti', enable_events=True, default=True), sg.Radio('img->img', 'SamplerProcess', enable_events=True, k='iti'), sg.Push(), GroupCheckbox('sampler', default=False)],
+            sg.Radio('txt->img', 'SamplerProcess', k='tti', enable_events=True, default=True), sg.Radio('img->img', 'SamplerProcess', enable_events=True, k='iti'), sg.Radio('gfpgan', 'SamplerProcess', enable_events=True, k='gfp'), sg.Push(), GroupCheckbox('sampler', default=False)],
 
         InputRow('Prompt'               , 'prompt'      , opt.prompt      , 'Description of the image you would like to see.' , input_size_v=3                                                                                          , groupable=True, group_default=True),
         InputRow('Seed'                 , 'seed'        , opt.seed        , 'Seed for first image generation.'                                                                                                                          , groupable=True, group_default=True),
-        InputRow('Seed Sampler Offset'  , 'seed_offset' , opt.seed_offset , 'Numeric offset into batch.  Effectively, number of samples to skip.  Useful if you want to re-run a single image generation nested within a sample batch.' , groupable=True, group_default=True),
+        InputRow('Seed Sampler Offset'  , 'seed_offset' , opt.seed_offset , 'Numeric offset into batch.  Effectively, number of samples to skip.  Useful if you want to re-run a single image generation nested within a sample batch.' , vis=False, groupable=True, group_default=True),
         InputRow('Sampler Substeps'     , 'ddim_steps'  , opt.ddim_steps  , 'Number of substeps per batch.'                                                                                                                             , groupable=True                    ),
         InputRow('Guidance Scale'       , 'scale'       , opt.scale       , 'Unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))'                                                                , groupable=True                    ),
         InputRow('Iterations'           , 'n_iter'      , opt.n_iter      , 'Number of batches per generation.'                                                                                                                                                             ),
         InputRow('Batch Size (Samples)' , 'n_samples'   , opt.n_samples   , 'Number of samples per batch.'                                                                                                                                                                  ),
-        InputRow('Strength'             , 'strength'    , opt.strength    , 'Image-to-Image strength (0.0, 1.0)'                                                                                                                                                            ),
+        InputRow('Strength'             , 'strength'    , opt.strength    , 'Image-to-Image strength (0.0, 1.0)'                                                                                                                        , disabled=True                     ),
         InputRow('Sampler Eta'          , 'ddim_eta'    , opt.ddim_eta    , 'Deprecated: ddim eta'                                                                                                                                      , vis=False                         ),
 
         [
@@ -210,9 +224,9 @@ def ui_thread(window:sg.Window):
             _img, _options, _samplenum = datalist[index]
             if _options is not None:
                 window['SampleInfo'].update(
-                    f"{_options['process']}-{_options['sampler']:10} | seed: {_options['seed']:010}:{_options['seed_offset']+_samplenum:03}\n\
-substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
-> \"{_options['prompt']}\"")
+                    f"{_options['process']+'-'+_options['sampler']:14} | seed: {_options['seed']:010}:{_options['seed_offset']+_samplenum:03}\n"+
+                    f"substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n"+
+                    f"> \"{_options['prompt']}\"")
             else:
                 window['SampleInfo'].update("Sample was not generated by this program.  No parameters to show.")
             window['Image'].update(data=ImageTk.PhotoImage(_img))
@@ -316,21 +330,30 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
 
     def GenerateYield():
         global curr_sample_i
-        global g_init_img
+        global g_backend_input
+        
 
         if values['tti']: #text to image params:
             opt.process = 'tti'
             opt.W, opt.H = (512, 512)
-        else:
-            opt.process = 'iti'
-            g_init_img = datalist[curr_sample_i][0]
-            opt.W, opt.H = g_init_img.size
+        elif values['gfp']:
+            opt.process = 'gfpgan'
+            g_backend_input.img = datalist[curr_sample_i][0] 
+            g_backend_input.opt = datalist[curr_sample_i][1].copy()
+            g_backend_input.samplenum = datalist[curr_sample_i][2]
+            g_backend_input.opt['process'] = opt.process
+            g_backend_input.opt['_saved'] = False
 
+        elif values['iti']:
+            opt.process = 'iti'
+            g_backend_input.img = datalist[curr_sample_i][0]
+            opt.W, opt.H = g_backend_input.img.size
+
+        g_backend_input._visualize_sub =  values['_visualize_sub']
 
         opt.prompt =        values['prompt']
         opt.skip_grid =       values['skip_grid']
         opt.skip_save =       values['skip_save']
-        opt._visualize_sub =  values['_visualize_sub']
         opt.n_iter =        int(values['n_iter'])
         opt.n_samples =     int(values['n_samples'])
         opt.seed_offset =   int(values['seed_offset'])
@@ -348,8 +371,26 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
             sem_generate.release()      
             yield
 
-    def SetItiEnabled(val:bool):
-        window['strength'].update(disabled= not val)
+    def Greyout(base_keys):
+        window['prompt'].update(disabled=False)
+        window['seed'].update(disabled=False)
+        window['seed_offset'].update(disabled=False)
+        window['ddim_steps'].update(disabled=False)
+        window['scale'].update(disabled=False)
+        window['n_iter'].update(disabled=False)
+        window['n_samples'].update(disabled=False)
+        window['strength'].update(disabled=False)
+        window['ddim_eta'].update(disabled=False)
+        for key in base_keys: window[key].update(disabled=True)
+
+
+    def SetProcess(val:str):
+        if val == 'tti':
+            Greyout(['strength'])
+        if val == 'iti':
+            Greyout([])
+        if val == 'gfp':
+            Greyout(['prompt', 'seed', 'seed_offset', 'ddim_steps', 'scale', 'n_iter', 'n_samples'])
 
     def ParseNumericParam(input:str, castfn): 
         s = input.split(':')
@@ -369,6 +410,7 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
     window.bind('<Escape>', '-ESC-')
     window.bind('<Return>', 'Generate')
     window.bind('<Delete>', '-CLEAR-')
+    window.bind('<Control-c>', '-COPY-')
     window.bind('<Control-s>', '-SAVE-')
     window.bind('<Control-S>', '-SAVEALL-')
 
@@ -383,13 +425,13 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
         event, values = window.read()
 
         if event == 'Generate': # generate button event
-            opt.cancel = False
+            g_backend_input.cancel = False
             generator_params_yield = GenerateYield()
             SetThreadActionsDisabled(True)
             next(generator_params_yield)
 
         elif event == 'Cancel':
-            opt.cancel = True
+            g_backend_input.cancel = True
 
 
         elif event == '-READY-':
@@ -409,10 +451,8 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
             SetThreadActionsDisabled(True)
             sem_generate.release()
 
-        elif event == 'tti':
-            SetItiEnabled(False)
-        elif event == 'iti':
-            SetItiEnabled(True)
+        elif event in ['tti', 'iti', 'gfp']:
+            SetProcess(event)
 
 
         elif event == '-IMAGE-': # new image from backend event
@@ -441,6 +481,11 @@ substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n\
 
             window['GenerateProgress'].update(current_count=_i, max=opt.ddim_steps-1)
             
+        elif event == '-COPY-':
+            window.TKroot.clipboard_clear()
+            window.TKroot.clipboard_append("Hello there.")
+
+
         elif event == '-SAVE-':
             if len(datalist) > 0:
                 SaveImage(curr_sample_i)
@@ -595,10 +640,10 @@ def backend_loop():
 
         def substep_callback( x0,  i ):
             imgs = None
-            if opt._visualize_sub:
+            if g_backend_input._visualize_sub:
                 imgs = t2i._samples_to_images(x0)
             window.write_event_value('-ITER-', (imgs, i))
-            if opt.cancel:
+            if g_backend_input.cancel:
                 raise KeyboardInterrupt
 
         def iter_callback(img:Image, seed, i):
@@ -608,21 +653,46 @@ def backend_loop():
             
             
         seed_everything(opt.seed)
-        t2i.prompt2image(prompt=opt.prompt,
-            iterations=opt.n_iter,
-            batch_size=opt.n_samples,
-            steps=opt.ddim_steps,
-            seed=opt.seed,
-            cfg_scale=opt.scale,
-            ddim_eta=opt.ddim_eta,
-            image_callback=iter_callback,
-            step_callback=substep_callback,
-            width=opt.W,
-            height=opt.H,
-            sampler_name=opt.sampler,
-            strength=opt.strength,
-            init_img=g_init_img if opt.process == 'iti' else None
-        )
+        if opt.process == 'gfpgan':
+
+            
+            try:
+                from ldm.gfpgan.gfpgan_tools import _run_gfpgan
+
+                img = _run_gfpgan(g_backend_input.img, opt.strength, 1)
+                window.write_event_value("-IMAGE-", (img, g_backend_input.opt, g_backend_input.samplenum))
+
+            except Exception as e:
+                print(
+                    f'Error running RealESRGAN - Your image was not upscaled.\n{e}'
+                )
+
+                # from ldm.gfpgan.gfpgan_tools import (
+                #     real_esrgan_upscale,
+                # )
+                # if len(upscale) < 2:
+                #     upscale.append(0.75)
+                # image = real_esrgan_upscale(
+                #     image,
+                #     upscale[1],
+                #     int(upscale[0])
+                # )
+        else:
+            t2i.prompt2image(prompt=opt.prompt,
+                iterations=opt.n_iter,
+                batch_size=opt.n_samples,
+                steps=opt.ddim_steps,
+                seed=opt.seed,
+                cfg_scale=opt.scale,
+                ddim_eta=opt.ddim_eta,
+                image_callback=iter_callback,
+                step_callback=substep_callback,
+                width=opt.W,
+                height=opt.H,
+                sampler_name=opt.sampler,
+                strength=opt.strength,
+                init_img=g_backend_input.img if opt.process == 'iti' else None
+            )
 
 
     
@@ -682,6 +752,7 @@ def parse_args():
         help="which sampler to use",
         default="k_lms"
     )
+    
     parser.add_argument(
         "--laion400m",
         action='store_true',
@@ -807,6 +878,8 @@ def parse_args():
         opt.config = "configs/latent-diffusion/txt2img-1p4B-eval.yaml"
         opt.ckpt = "models/ldm/text2img-large/model.ckpt"
         opt.outdir = "outputs/txt2img-samples-laion400m"
+
+    opt.process = 'tti'
 
     return opt
 

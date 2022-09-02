@@ -3,6 +3,8 @@
 ## Major Features
 
 - [ ] inpainting
+- [ ] GFPGAN
+- [ ] Real-ESRGAN
 - [ ] outpainting
 - [ ] GIF export
 - [ ] memory-optimized models
@@ -30,6 +32,7 @@ Done:
 
 - [ ] streamline event system in ui_thread
 - [ ] refactor usage of opt as state matrix
+  - keys: cancel, _visualize_sub, _saved, n_iter,  
 - [ ] improved grid w/ auto axis-labeling
 - [ ] status bar full event coverage
 - [ ] copy image to clipboard

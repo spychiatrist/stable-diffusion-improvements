@@ -46,16 +46,33 @@ conda env create -f environment.yaml
 conda activate ldm
 ```
 
+To update, run:
+
+```
+git pull
+conda env update -f environment.yaml
+```
+
 Place your obtained `model.ckpt` file in new folder: `.\stable-diffusion-improvements\models\ldm\stable-diffusion-v1`  
 
 If it's not named `model.ckpt`, and is instead something like `sd-v1-4.ckpt`, just rename it.
+
+If you would like to install RealESRGAN and GFPGAN, do the following in the base directory:
+
+```bash
+git clone https://github.com/TencentARC/GFPGAN.git
+python .\GFPGAN\setup.py develop
+python .\scripts\preload_models.py
+```
+
+Place your obtained `GFPGANv1.3.pth` [(link)](https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth) file in new folder: `.\stable-diffusion-improvements\GFPGAN\experiments\pretrained_models`  
 
 ## Usage
 
 Using the interactive mode is straightforward.  Simply call (with `ldm` conda env active):
 
 ```
-python scripts\txt2img.py --interactive
+python .\scripts\txt2img.py --interactive
 ```
 
 Any classic arguments passed to txt2img.py will show up in the interactive view as parameter textbox/checkbox defaults.  Await the activation of the `Generate` button, and create to your heart's content.

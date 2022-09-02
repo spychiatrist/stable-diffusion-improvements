@@ -340,15 +340,13 @@ class T2I:
                                 image = real_esrgan_upscale(
                                     image,
                                     upscale[1],
-                                    int(upscale[0]),
-                                    prompt,
-                                    seed,
+                                    int(upscale[0])
                                 )
                             if gfpgan_strength > 0:
                                 from ldm.gfpgan.gfpgan_tools import _run_gfpgan
 
                                 image = _run_gfpgan(
-                                    image, gfpgan_strength, prompt, seed, 1
+                                    image, gfpgan_strength, 1
                                 )
                         except Exception as e:
                             print(

@@ -5,16 +5,14 @@ import sys
 import numpy as np
 
 from PIL import Image
-from scripts.dream import create_argv_parser
 
-arg_parser = create_argv_parser()
-opt = arg_parser.parse_args()
 
-model_path = os.path.join(opt.gfpgan_dir, opt.gfpgan_model_path)
+
+model_path = os.path.join('GFPGAN', 'experiments','pretrained_models','GFPGANv1.3.pth')
 gfpgan_model_exists = os.path.isfile(model_path)
 
-def _run_gfpgan(image, strength, prompt, seed, upsampler_scale=4):
-    print(f'\n* GFPGAN - Restoring Faces: {prompt} : seed:{seed}')
+def _run_gfpgan(image, strength, upsampler_scale=4):
+    print(f'\n* GFPGAN - Restoring Faces:')
     gfpgan = None
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=DeprecationWarning)
@@ -24,11 +22,11 @@ def _run_gfpgan(image, strength, prompt, seed, upsampler_scale=4):
             if not gfpgan_model_exists:
                 raise Exception('GFPGAN model not found at path ' + model_path)
 
-            sys.path.append(os.path.abspath(opt.gfpgan_dir))
+            sys.path.append(os.path.abspath('GFPGAN'))
             from gfpgan import GFPGANer
 
             bg_upsampler = _load_gfpgan_bg_upsampler(
-                opt.gfpgan_bg_upsampler, upsampler_scale, opt.gfpgan_bg_tile
+                'realesrgan', upsampler_scale, 400
             )
 
             gfpgan = GFPGANer(
@@ -127,9 +125,9 @@ def _load_gfpgan_bg_upsampler(bg_upsampler, upsampler_scale, bg_tile=400):
     return bg_upsampler
 
 
-def real_esrgan_upscale(image, strength, upsampler_scale, prompt, seed):
+def real_esrgan_upscale(image, strength, upsampler_scale):
     print(
-        f'\n* Real-ESRGAN Upscaling: {prompt} : seed:{seed} : scale:{upsampler_scale}x'
+        f'\n* Real-ESRGAN Upscaling: scale:{upsampler_scale}x'
     )
 
     with warnings.catch_warnings():
@@ -138,7 +136,7 @@ def real_esrgan_upscale(image, strength, upsampler_scale, prompt, seed):
 
         try:
             upsampler = _load_gfpgan_bg_upsampler(
-                opt.gfpgan_bg_upsampler, upsampler_scale, opt.gfpgan_bg_tile
+                'realesrgan', upsampler_scale, 400
             )
         except Exception:
             import traceback
@@ -149,7 +147,6 @@ def real_esrgan_upscale(image, strength, upsampler_scale, prompt, seed):
     output, img_mode = upsampler.enhance(
         np.array(image, dtype=np.uint8),
         outscale=upsampler_scale,
-        alpha_upsampler=opt.gfpgan_bg_upsampler,
     )
 
     res = Image.fromarray(output)

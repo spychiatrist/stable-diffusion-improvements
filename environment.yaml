@@ -26,6 +26,9 @@ dependencies:
     - torchmetrics==0.6.0
     - kornia==0.6
     - pysimplegui
+    - basicsr
+    - facexlib
+    - realesrgan
     - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
     - -e git+https://github.com/openai/CLIP.git@main#egg=clip
     - -e git+https://github.com/lstein/k-diffusion.git@master#egg=k-diffusion
