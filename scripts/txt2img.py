@@ -113,8 +113,8 @@ def make_ui():
         InputRow('Sampler Eta'          , 'ddim_eta'    , opt.ddim_eta    , 'Deprecated: ddim eta'                                                                                                                                      , vis=False                         ),
 
         [
-            sg.Checkbox('Skip Sample Save',key='skip_save', default=opt.skip_save, tooltip='If checked, program will not save each sample automatically.'),
-            sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid, tooltip='If checked, program will not save grid collages of each batch.')
+            sg.Checkbox('Skip Sample Save',key='skip_save', default=opt.skip_save, tooltip='If checked, program will not save each sample automatically.', visible=False),
+            sg.Checkbox('Skip Grid Save',key='skip_grid', default=opt.skip_grid, tooltip='If checked, program will not save grid collages of each batch.', visible=False)
         ],
         [sg.Button('Generate', size=(20,2), disabled=True), sg.Button('Cancel', size=(12,2), disabled=False), sg.ProgressBar(k='GenerateProgress', max_value=100, s=(30, 20), orientation='h')],
         [sg.HSeparator()],
