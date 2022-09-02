@@ -28,7 +28,8 @@ Done:
 - [x] enable strength when img2img enabled
 ## Minor Features
 
-- [ ] img load from any source (img2img)
+- [ ] streamline event system in ui_thread
+- [ ] refactor usage of opt as state matrix
 - [ ] improved grid w/ auto axis-labeling
 - [ ] status bar full event coverage
 - [ ] copy image to clipboard
@@ -42,6 +43,7 @@ Done:
 
 Done:
 
+- [x] img load from any source (img2img)
 - [x] sampler group for scrolling (up/down)
 - [x] cancel generation
 - [x] prompt clear button
