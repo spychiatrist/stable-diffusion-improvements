@@ -3,7 +3,6 @@
 ## Major Features
 
 - [ ] inpainting
-- [ ] GFPGAN
 - [ ] Real-ESRGAN
 - [ ] outpainting
 - [ ] GIF export
@@ -11,6 +10,7 @@
 
 Done:
 
+- [x] GFPGAN
 - [x] img2img direct tab
 - [x] k_lms & friends (`https://github.com/lstein/k-diffusion.git@master#egg=k-diffusion`)
 - [x] differential param modulation by functions (UI or text)
@@ -31,14 +31,11 @@ Done:
 ## Minor Features
 
 - [ ] streamline event system in ui_thread
-- [ ] refactor usage of opt as state matrix
-  - keys: cancel, _visualize_sub, _saved, n_iter,  
 - [ ] improved grid w/ auto axis-labeling
 - [ ] status bar full event coverage
 - [ ] copy image to clipboard
 - [ ] save project
 - [ ] highlight grouped in thumbnails
-- [ ] queue generations
 - [ ] update in-app
 - [ ] checkboxes for reuptake of parameters
 - [ ] UI refresh
@@ -46,6 +43,9 @@ Done:
 
 Done:
 
+- [x] refactor usage of opt as state matrix
+- [x] queue generations
+  - keys: cancel, _visualize_sub, _saved, n_iter,  
 - [x] img load from any source (img2img)
 - [x] sampler group for scrolling (up/down)
 - [x] cancel generation

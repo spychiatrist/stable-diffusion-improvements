@@ -1,4 +1,5 @@
 import argparse, os, sys, glob
+import queue
 import json
 #from ctypes import alignment
 #from ast import arg
@@ -21,15 +22,32 @@ class BackendInput:
 
     def __init__(
         self,
-        img = None, 
-        opt = None, 
-        samplenum = 0
-    ):
-        self.img = img
-        self.opt = opt
-        self.samplenum = samplenum      
+    ):    
         self._visualize_sub = False
         self.cancel = False  
+        self.change_model = False  
+        self.commandQueue = queue.Queue()
+
+class BackendCommand:
+    def __init__(
+        self, 
+    ):
+        self.sampler = None
+        self.prompt = None
+        self.seed = None
+        self.ddim_steps = None
+        self.scale = None
+        self.n_iter = None
+        self.n_samples = None
+        self.strength = None
+        self.ddim_eta = None
+        self.process = None
+        self.width = None
+        self.height = None
+        self.img = None
+        self.prevCmdDict = None
+        self.prevCmdSamplenum = None
+    
 
 opt = None
 g_backend_input = BackendInput()
@@ -113,12 +131,11 @@ def make_ui():
 
     layout_settings = [
         # [sg.Text('Parameters', font='Any 13')],
-        [TextLabel('Sampler', 'SamplerCombo'), sg.Combo(sampler_choices, default_value=sampler_choices[0], enable_events=True, k='SamplerCombo' ), 
+        [TextLabel('Sampler', 'SamplerCombo'), sg.Combo(sampler_choices, default_value=opt.sampler if opt.sampler in sampler_choices else sampler_choices[0], enable_events=True, k='SamplerCombo' ), 
             sg.Radio('txt->img', 'SamplerProcess', k='tti', enable_events=True, default=True), sg.Radio('img->img', 'SamplerProcess', enable_events=True, k='iti'), sg.Radio('gfpgan', 'SamplerProcess', enable_events=True, k='gfp'), sg.Push(), GroupCheckbox('sampler', default=False)],
 
         InputRow('Prompt'               , 'prompt'      , opt.prompt      , 'Description of the image you would like to see.' , input_size_v=3                                                                                          , groupable=True, group_default=True),
         InputRow('Seed'                 , 'seed'        , opt.seed        , 'Seed for first image generation.'                                                                                                                          , groupable=True, group_default=True),
-        InputRow('Seed Sampler Offset'  , 'seed_offset' , opt.seed_offset , 'Numeric offset into batch.  Effectively, number of samples to skip.  Useful if you want to re-run a single image generation nested within a sample batch.' , vis=False, groupable=True, group_default=True),
         InputRow('Sampler Substeps'     , 'ddim_steps'  , opt.ddim_steps  , 'Number of substeps per batch.'                                                                                                                             , groupable=True                    ),
         InputRow('Guidance Scale'       , 'scale'       , opt.scale       , 'Unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))'                                                                , groupable=True                    ),
         InputRow('Iterations'           , 'n_iter'      , opt.n_iter      , 'Number of batches per generation.'                                                                                                                                                             ),
@@ -224,7 +241,7 @@ def ui_thread(window:sg.Window):
             _img, _options, _samplenum = datalist[index]
             if _options is not None:
                 window['SampleInfo'].update(
-                    f"{_options['process']+'-'+_options['sampler']:14} | seed: {_options['seed']:010}:{_options['seed_offset']+_samplenum:03}\n"+
+                    f"{_options['process']+'-'+_options['sampler']:14} | seed: {_options['seed']:010}:{_samplenum:03}\n"+
                     f"substeps: {_options['ddim_steps']:3}  | scale: {_options['scale']}\n"+
                     f"> \"{_options['prompt']}\"")
             else:
@@ -332,31 +349,7 @@ def ui_thread(window:sg.Window):
         global curr_sample_i
         global g_backend_input
         
-
-        if values['tti']: #text to image params:
-            opt.process = 'tti'
-            opt.W, opt.H = (512, 512)
-        elif values['gfp']:
-            opt.process = 'gfpgan'
-            g_backend_input.img = datalist[curr_sample_i][0] 
-            g_backend_input.opt = datalist[curr_sample_i][1].copy()
-            g_backend_input.samplenum = datalist[curr_sample_i][2]
-            g_backend_input.opt['process'] = opt.process
-            g_backend_input.opt['_saved'] = False
-
-        elif values['iti']:
-            opt.process = 'iti'
-            g_backend_input.img = datalist[curr_sample_i][0]
-            opt.W, opt.H = g_backend_input.img.size
-
-        g_backend_input._visualize_sub =  values['_visualize_sub']
-
-        opt.prompt =        values['prompt']
-        opt.skip_grid =       values['skip_grid']
-        opt.skip_save =       values['skip_save']
-        opt.n_iter =        int(values['n_iter'])
-        opt.n_samples =     int(values['n_samples'])
-        opt.seed_offset =   int(values['seed_offset'])
+        
 
         l_scale =           ParseNumericParam( (values['scale']), float)
         l_strength =        ParseNumericParam( (values['strength']), float)
@@ -367,14 +360,41 @@ def ui_thread(window:sg.Window):
         perm_iterator = product(l_scale, l_strength, l_ddim_eta, l_ddim_steps, l_seed)
 
         for opt_it in perm_iterator:
-            opt.scale, opt.strength, opt.ddim_eta, opt.ddim_steps, opt.seed = opt_it
-            sem_generate.release()      
-            yield
+
+            cmd = BackendCommand()
+
+            if values['tti']: #text to image params:
+                cmd.process = 'tti'
+                cmd.width, cmd.height = (512, 512)
+            elif values['gfp']:
+                cmd.process = 'gfpgan'
+                cmd.img = datalist[curr_sample_i][0] 
+                cmd.prevCmdDict = datalist[curr_sample_i][1].copy()
+                cmd.prevCmdSamplenum = datalist[curr_sample_i][2]
+                cmd.prevCmdDict['process'] = cmd.process
+                cmd.prevCmdDict['_saved'] = False
+
+            elif values['iti']:
+                cmd.process = 'iti'
+                cmd.img = datalist[curr_sample_i][0]
+                cmd.width, cmd.height = cmd.img.size
+
+            g_backend_input._visualize_sub =  values['_visualize_sub']
+
+            cmd.sampler =        values['SamplerCombo']
+            cmd.prompt =        values['prompt']
+            cmd.n_iter =        int(values['n_iter'])
+            cmd.n_samples =     int(values['n_samples'])
+
+            cmd.scale, cmd.strength, cmd.ddim_eta, cmd.ddim_steps, cmd.seed = opt_it
+
+            g_backend_input.commandQueue.put(cmd)
+
+        sem_generate.release()     
 
     def Greyout(base_keys):
         window['prompt'].update(disabled=False)
         window['seed'].update(disabled=False)
-        window['seed_offset'].update(disabled=False)
         window['ddim_steps'].update(disabled=False)
         window['scale'].update(disabled=False)
         window['n_iter'].update(disabled=False)
@@ -390,7 +410,7 @@ def ui_thread(window:sg.Window):
         if val == 'iti':
             Greyout([])
         if val == 'gfp':
-            Greyout(['prompt', 'seed', 'seed_offset', 'ddim_steps', 'scale', 'n_iter', 'n_samples'])
+            Greyout(['prompt', 'seed', 'ddim_steps', 'scale', 'n_iter', 'n_samples'])
 
     def ParseNumericParam(input:str, castfn): 
         s = input.split(':')
@@ -418,38 +438,28 @@ def ui_thread(window:sg.Window):
 
     SetSampleAndInfo(0)
 
-    generator_params_yield = None
-
     while True:
 
         event, values = window.read()
 
         if event == 'Generate': # generate button event
             g_backend_input.cancel = False
-            generator_params_yield = GenerateYield()
+            GenerateYield()
             SetThreadActionsDisabled(True)
-            next(generator_params_yield)
-
+            
         elif event == 'Cancel':
             g_backend_input.cancel = True
 
 
         elif event == '-READY-':
-            if generator_params_yield != None:
-                try:
-                    next(generator_params_yield)
-                except StopIteration:
-                    generator_params_yield = None
-                    SetThreadActionsDisabled(False)
-            else:
-                SetThreadActionsDisabled(False)  
+            SetThreadActionsDisabled(False)  
 
-        elif event == 'SamplerCombo':
-            opt.sampler = values[event]
-            opt.change_model = True
+        # elif event == 'SamplerCombo':
+        #     g_backend_input.sampler = values[event]
+        #     g_backend_input.change_model = True
 
-            SetThreadActionsDisabled(True)
-            sem_generate.release()
+        #     SetThreadActionsDisabled(True)
+        #     sem_generate.release()
 
         elif event in ['tti', 'iti', 'gfp']:
             SetProcess(event)
@@ -474,12 +484,12 @@ def ui_thread(window:sg.Window):
 
 
         elif event == '-ITER-':
-            imgs, _i = values[event]
+            imgs, _i, _max_it = values[event]
             if values['_visualize_sub'] and imgs != None: 
                 #for img in imgs:
                 window['Image'].update(data=ImageTk.PhotoImage(imgs[0]))
 
-            window['GenerateProgress'].update(current_count=_i, max=opt.ddim_steps-1)
+            window['GenerateProgress'].update(current_count=_i, max=_max_it-1)
             
         elif event == '-COPY-':
             window.TKroot.clipboard_clear()
@@ -517,7 +527,7 @@ def ui_thread(window:sg.Window):
 
                     window['prompt'      ].update(value=str(_opt['prompt'      ]))
                     window['seed'        ].update(value=str(_opt['seed'        ]))
-                    window['seed_offset' ].update(value=str(_opt['seed_offset' ] + (_samplenum if values['-RESET-PARAMS-SingleShot-'] else 0)))
+                    # window['seed_offset' ].update(value=str(_opt['seed_offset' ] + (_samplenum if values['-RESET-PARAMS-SingleShot-'] else 0)))
                     window['ddim_steps'  ].update(value=str(_opt['ddim_steps'  ]))
                     window['n_iter'      ].update(value=str(1 if values['-RESET-PARAMS-SingleShot-'] else _opt['n_iter'      ]))
                     window['n_samples'   ].update(value=str(1 if values['-RESET-PARAMS-SingleShot-'] else _opt['n_samples'   ]))
@@ -545,8 +555,8 @@ def ui_thread(window:sg.Window):
                 _, _o2, _sn2 = d2
                 def _cmp_key(key):
                     return _o1[key] == _o2[key]
-                if values['g_seed'       ] and not  _cmp_key('seed'                         ): return False
-                if values['g_seed_offset'] and not (_cmp_key('seed_offset') and _sn1 == _sn2): return False
+                if values['g_seed'       ] and not (_cmp_key('seed')        and _sn1 == _sn2): return False
+                # if values['g_seed_offset'] and not (_cmp_key('seed_offset') ): return False
                 if values['g_ddim_steps' ] and not  _cmp_key('ddim_steps'                   ): return False
                 if values['g_scale'      ] and not  _cmp_key('scale'                        ): return False
                 if values['g_sampler'    ] and not  _cmp_key('sampler'                      ): return False
@@ -616,51 +626,57 @@ def backend_loop():
     )
 
     t2i.load_model()
+
+
     
-    opt.change_model = False
+    cmd:BackendCommand = None
 
     while True:
         #await mutex to proceed
-        window.write_event_value("-READY-", None)
-        sem_generate.acquire()
 
-        if opt.change_model:
-            t2i.sampler_name = opt.sampler
-            t2i._set_sampler()
-            opt.change_model = False
+        try:
+            cmd = g_backend_input.commandQueue.get(False)
+
+        except queue.Empty as e:
+            
+            window.write_event_value("-READY-", None)
+            sem_generate.acquire()
             continue
 
-        os.makedirs(opt.outdir, exist_ok=True)
-        outpath = opt.outdir
+        # if opt.change_model:
+        #     t2i.sampler_name = opt.sampler
+        #     t2i._set_sampler()
+        #     opt.change_model = False
+        #     continue
 
-        sample_path = os.path.join(outpath, "samples")
-        os.makedirs(sample_path, exist_ok=True)
-
-
+        
 
         def substep_callback( x0,  i ):
             imgs = None
             if g_backend_input._visualize_sub:
                 imgs = t2i._samples_to_images(x0)
-            window.write_event_value('-ITER-', (imgs, i))
+            window.write_event_value('-ITER-', (imgs, i, cmd.ddim_steps))
             if g_backend_input.cancel:
                 raise KeyboardInterrupt
 
         def iter_callback(img:Image, seed, i):
-            opt.seed=seed
-            _metadata = (img, opt.__dict__.copy(), i)
+            cmd.seed=seed
+            _tmpimg = cmd.img
+            cmd.img = None #don't store the image in the copy TODO fix this hack
+            _metadata = (img, cmd.__dict__.copy(), i)
+            cmd.img = _tmpimg
             window.write_event_value("-IMAGE-", _metadata)
             
             
-        seed_everything(opt.seed)
-        if opt.process == 'gfpgan':
+        seed_everything(cmd.seed)
+        if cmd.process == 'gfpgan':
 
             
             try:
                 from ldm.gfpgan.gfpgan_tools import _run_gfpgan
 
-                img = _run_gfpgan(g_backend_input.img, opt.strength, 1)
-                window.write_event_value("-IMAGE-", (img, g_backend_input.opt, g_backend_input.samplenum))
+                img = _run_gfpgan(cmd.img, cmd.strength, 1)
+                window.write_event_value("-IMAGE-", (img, cmd.prevCmdDict, cmd.prevCmdSamplenum))
 
             except Exception as e:
                 print(
@@ -678,20 +694,20 @@ def backend_loop():
                 #     int(upscale[0])
                 # )
         else:
-            t2i.prompt2image(prompt=opt.prompt,
-                iterations=opt.n_iter,
-                batch_size=opt.n_samples,
-                steps=opt.ddim_steps,
-                seed=opt.seed,
-                cfg_scale=opt.scale,
-                ddim_eta=opt.ddim_eta,
+            t2i.prompt2image(prompt=cmd.prompt,
+                iterations=cmd.n_iter,
+                batch_size=cmd.n_samples,
+                steps=cmd.ddim_steps,
+                seed=cmd.seed,
+                cfg_scale=cmd.scale,
+                ddim_eta=cmd.ddim_eta,
                 image_callback=iter_callback,
                 step_callback=substep_callback,
-                width=opt.W,
-                height=opt.H,
-                sampler_name=opt.sampler,
-                strength=opt.strength,
-                init_img=g_backend_input.img if opt.process == 'iti' else None
+                width=cmd.width,
+                height=cmd.height,
+                sampler_name=cmd.sampler,
+                strength=cmd.strength,
+                init_img=cmd.img if cmd.process == 'iti' else None
             )
 
 
@@ -846,12 +862,12 @@ def parse_args():
         default=42,
         help="the seed (for reproducible sampling)",
     )
-    parser.add_argument(
-        "--seed_offset",
-        type=int,
-        default=0,
-        help="how many samples forward should the seed state emulate",
-    )
+    # parser.add_argument(
+    #     "--seed_offset",
+    #     type=int,
+    #     default=0,
+    #     help="how many samples forward should the seed state emulate",
+    # )
     parser.add_argument(
         "--precision",
         type=str,
